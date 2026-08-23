@@ -426,7 +426,7 @@ Measure
   - Average Selling Price (ราคาขายเฉลี่ยต่อชิ้น): "Sales Amount"/"Quantity" 
 
 ## Data Model Diagram (Star Scheme) แซนด์วิช
-
+<img src="./readme_images/star schema.jpg">
 
 ## ETL  (น้ำตาล)
 
