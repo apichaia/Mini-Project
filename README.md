@@ -376,6 +376,49 @@ shipments	status	object	สถานะการจัดส่ง
 
 
 ## Multidimensional Data Model Design (ต้นข้าว)
+เริ่มจากการวิเคราะห์ข้อมูลจากระบบขายปลีกที่ประกอบด้วยไฟล์ข้อมูล 12 ตาราง ได้แก่ Categories, Customers, Employees, Order Items, Orders, Payments, Products, Promotions, Returns, Shipments, Stores และ Suppliers
+จากนั้นกำหนด Business Process หลัก คือ กระบวนการขายสินค้า (Sales Process) เนื่องจากเป็นกระบวนการที่เชื่อมโยงข้อมูลส่วนใหญ่ของระบบ เช่น ลูกค้า สินค้า ร้านค้า พนักงาน โปรโมชั่น การชำระเงิน และการจัดส่งสินค้า
+จากนั้นแยกข้อมูลเชิงพรรณนาออกเป็น Dimension Tables และเก็บข้อมูลเชิงตัวเลขที่ใช้วิเคราะห์ไว้ใน Fact Table
+- Dim_Date: Day → Month → Quarter → Year
+ใช้ในการดูยอดขายแต่ละวัน เดือน ไตรมาส และปี
+- Dim_Product: Category → Sub-Category
+ใช้ในการจัดหมวดหมู่ผลิตภัณฑ์
+- Dim_Customer: Customer
+ใช้ในการวิเคราะห์พฤติกรรมของลูกค้า
+- Dim_Store: Store → District → Province → Region
+ใช้ในการวิเคราะห์ผลการดำเนินงานรายสาขาและพื้นที่
+- Dim_Employee: Employee
+ใช้ในการวิเคราะห์พฤติกรรมการทำงานของพนักงาน
+- Dim_Promotion: Promotion => Discount, Special Deal, Cupon, Point
+ใช้ในการวิเคราะห์ส่วนของโปรโมชั่น เช่น ส่วนลด ของแถม ดีล คูปอง และ พอยท์
+- Dim_Supplier: Supplier
+ใช้ในการวิเคราะห์เรื่องซัพพลายเออร์,การจัดการทรัพยากร
+- Dim_Payment: Payment Method ใช้ในการวิเคราห์วิธีการชำระเงินของลูกค้า
+ในส่วนของ Fact Tables [Fact_Sales] จะมี Source หลักๆ คือ
+	Order_items.csv
+	Orders.csv
+ในส่วนไฟล์ข้อมูล Returns และ Shipments สามารถนำมาสร้างเป็น Fact แยกออกมา
+	Returns  → Fact_Returns เพื่อวิเคราะห์อัตราการคืนสินค้า (Return Rate) ตามสาขา หรือตามประเภทสินค้า
+	Shipments  →  Fact_Shipments เพื่อวัดประสิทธิภาพระยะเวลาจัดส่ง (Delivery Lead Time) และคลังสินค้า
+กำหนด Grain ของ Fact Table ว่า
+“1 แถว แทนสินค้า 1 รายการในคำสั่งซื้อ 1 รายการ (One Order Line Item)”
+Foreign Keys:
+	Date_ID
+	Product_ID
+	Customer_ID
+	Store_ID
+	Employee_ID
+	Promotion_ID
+	Supplier_ID
+	Payment_ID
+Measure
+	Quantity (จำนวนสินค้า) จำนวนชิ้นที่ขายได้ในรายการนั้น
+	Sales Amount (ยอดขาย) จำนวนเงินรวมหลังหักส่วนลด หรือราคาสุทธิ
+	Discount (ส่วนลด) มูลค่าส่วนลดที่ให้ในรายการนั้น
+	Profit (กำไรสุทธิ) กำไรสุทธิจากรายการนั้น
+	Calculated Measures
+	Profit Margin (%): ("Profit" /"Sales Amount" )×100
+Average Selling Price (ราคาขายเฉลี่ยต่อชิ้น): "Sales Amount"/"Quantity" 
 
 ## Data Model Diagram (Star Scheme) แซนด์วิช
 
