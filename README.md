@@ -394,31 +394,36 @@ shipments	status	object	สถานะการจัดส่ง
 - Dim_Supplier: Supplier
 ใช้ในการวิเคราะห์เรื่องซัพพลายเออร์,การจัดการทรัพยากร
 - Dim_Payment: Payment Method ใช้ในการวิเคราห์วิธีการชำระเงินของลูกค้า
+
 ในส่วนของ Fact Tables [Fact_Sales] จะมี Source หลักๆ คือ
-	Order_items.csv
-	Orders.csv
+- Order_items.csv
+- Orders.csv
+
 ในส่วนไฟล์ข้อมูล Returns และ Shipments สามารถนำมาสร้างเป็น Fact แยกออกมา
-	Returns  → Fact_Returns เพื่อวิเคราะห์อัตราการคืนสินค้า (Return Rate) ตามสาขา หรือตามประเภทสินค้า
-	Shipments  →  Fact_Shipments เพื่อวัดประสิทธิภาพระยะเวลาจัดส่ง (Delivery Lead Time) และคลังสินค้า
+- Returns  → Fact_Returns เพื่อวิเคราะห์อัตราการคืนสินค้า (Return Rate) ตามสาขา หรือตามประเภทสินค้า
+- Shipments  →  Fact_Shipments เพื่อวัดประสิทธิภาพระยะเวลาจัดส่ง (Delivery Lead Time) และคลังสินค้า
+
 กำหนด Grain ของ Fact Table ว่า
-“1 แถว แทนสินค้า 1 รายการในคำสั่งซื้อ 1 รายการ (One Order Line Item)”
+	“1 แถว แทนสินค้า 1 รายการในคำสั่งซื้อ 1 รายการ (One Order Line Item)”
+
 Foreign Keys:
-	Date_ID
-	Product_ID
-	Customer_ID
-	Store_ID
-	Employee_ID
-	Promotion_ID
-	Supplier_ID
-	Payment_ID
+- Date_ID
+- Product_ID
+- Customer_ID
+- Store_ID
+- Employee_ID
+- Promotion_ID
+- Supplier_ID
+- Payment_ID
+
 Measure
-	Quantity (จำนวนสินค้า) จำนวนชิ้นที่ขายได้ในรายการนั้น
-	Sales Amount (ยอดขาย) จำนวนเงินรวมหลังหักส่วนลด หรือราคาสุทธิ
-	Discount (ส่วนลด) มูลค่าส่วนลดที่ให้ในรายการนั้น
-	Profit (กำไรสุทธิ) กำไรสุทธิจากรายการนั้น
-	Calculated Measures
-	Profit Margin (%): ("Profit" /"Sales Amount" )×100
-Average Selling Price (ราคาขายเฉลี่ยต่อชิ้น): "Sales Amount"/"Quantity" 
+- Quantity (จำนวนสินค้า) จำนวนชิ้นที่ขายได้ในรายการนั้น
+- Sales Amount (ยอดขาย) จำนวนเงินรวมหลังหักส่วนลด หรือราคาสุทธิ
+- Discount (ส่วนลด) มูลค่าส่วนลดที่ให้ในรายการนั้น
+- Profit (กำไรสุทธิ) กำไรสุทธิจากรายการนั้น
+- Calculated MeasuresProfit Margin (%):
+  - ("Profit" /"Sales Amount" )×100
+  - Average Selling Price (ราคาขายเฉลี่ยต่อชิ้น): "Sales Amount"/"Quantity" 
 
 ## Data Model Diagram (Star Scheme) แซนด์วิช
 
