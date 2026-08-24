@@ -169,28 +169,19 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 ## ER Diagram (หลิน) 
 <img src="./readme_images/miniproject Diagram.drawio.png">
 อธิบายความสัมพันธ์
-|            Table         	| Relationship |             Table	          | 
-|---------------------------|--------------|------------------------------|
-|categories             	|      1:N     |products             	      | 
-|suppliers               	|      1:N     |products             	      | 
-|products               	|      1:N     |order_items                   | 
-|---------------------------|--------------|------------------------------|
-|orders                 	|      1:N     |order_items            	      | 
-|---------------------------|--------------|------------------------------|
-|order_items             	|      1:N     |returns             	      | 
-|---------------------------|--------------|------------------------------|
-|customers              	|      1:N     |orders              	      | 
-|---------------------------|--------------|------------------------------|
-|stores                 	|      1:N     |orders              	      | 
-|---------------------------|--------------|------------------------------|
-|promotions             	|      1:N     |orders              	      | 
-|---------------------------|--------------|------------------------------|
-|orders                 	|      1:N     |payments             	      | 
-|---------------------------|--------------|------------------------------|
-|orders                 	|      1:N     |shipments             	      | 
-|---------------------------|--------------|------------------------------|
-|stores                 	|      1:N     |employees             	      | 
-|---------------------------|--------------|------------------------------|
+| Table | Relationship | Table |
+|---|:---:|---|
+| categories | 1:N | products |
+| suppliers | 1:N | products |
+| products | 1:N | order_items |
+| orders | 1:N | order_items |
+| order_items | 1:N | returns |
+| customers | 1:N | orders |
+| stores | 1:N | orders |
+| promotions | 1:N | orders |
+| orders | 1:N | payments |
+| orders | 1:N | shipments |
+| stores | 1:N | employees |
 
 ## Business Questions (ฟีฟ่า)
 
