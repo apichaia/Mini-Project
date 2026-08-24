@@ -168,7 +168,72 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 
 ## ER Diagram (หลิน) 
 <img src="./readme_images/miniproject Diagram.drawio.png">
-อธิบายรายละเอียดด้วย
+อธิบายความสัมพันธ์
+categories
+
+products
+
+1 : N
+
+suppliers
+
+products
+
+1 : N
+
+products
+
+order_items
+
+1 : N
+
+orders
+
+order_items
+
+1 : N
+
+order_items
+
+returns
+
+1 : N
+
+customers
+
+orders
+
+1 : N
+
+stores
+
+orders
+
+1 : N
+
+promotions
+
+orders
+
+1 : N
+
+orders
+
+payments
+
+1 : N
+
+orders
+
+shipments
+
+1 : N
+
+stores
+
+employees
+
+1 : N
 
 ## Business Questions (ฟีฟ่า)
 
