@@ -15,7 +15,6 @@ WITH source AS (
 
         o.customer_id,
         o.store_id,
-        o.employee_id,
         o.promotion_id,
 
         p.supplier_id,
@@ -59,7 +58,6 @@ unique_source AS (
                 product_id,
                 customer_id,
                 store_id,
-                employee_id,
                 promotion_id,
                 order_date
         ) AS row_number
@@ -73,10 +71,8 @@ SELECT
     order_id,
     product_id,
     order_date,
-
     customer_id,
     store_id,
-    employee_id,
     promotion_id,
     supplier_id,
     payment_id,

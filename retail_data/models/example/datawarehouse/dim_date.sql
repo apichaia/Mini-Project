@@ -1,26 +1,35 @@
 WITH source AS (
 
-    SELECT
+    SELECT DISTINCT
 
-        date_id,
-        day,
-        month,
-        quarter,
-        year,
+        CAST(order_date AS DATE) AS order_date
 
-        current_localtimestamp() AS insertion_timestamp
+    FROM {{ ref('stg_orders') }}
 
-    FROM {{ ref('stg_date') }}
+    WHERE order_date IS NOT NULL
 
 ),
 
 unique_source AS (
 
     SELECT
-        *,
-        ROW_NUMBER() OVER (
-            PARTITION BY date_id
-        ) AS row_num
+
+        CAST(
+            STRFTIME(order_date, '%Y%m%d')
+            AS INTEGER
+        ) AS date_id,
+
+        order_date,
+
+        EXTRACT(DAY FROM order_date) AS day,
+
+        EXTRACT(MONTH FROM order_date) AS month,
+
+        EXTRACT(QUARTER FROM order_date) AS quarter,
+
+        EXTRACT(YEAR FROM order_date) AS year,
+
+        current_localtimestamp() AS insertion_timestamp
 
     FROM source
 
@@ -28,8 +37,4 @@ unique_source AS (
 
 SELECT *
 
-EXCLUDE (row_num)
-
 FROM unique_source
-
-WHERE row_num = 1
