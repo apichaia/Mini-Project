@@ -167,6 +167,7 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 
 
 ## ER Diagram (หลิน) 
+<img src="./readme_images/miniproject Diagram.drawio.png">
 อธิบายรายละเอียดด้วย
 
 ## Business Questions (ฟีฟ่า)
