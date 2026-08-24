@@ -183,7 +183,9 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 | stores | 1:N | employees |
 
 ## Business Questions (ฟีฟ่า)
-
+<img width="2481" height="3509" alt="Business Questions + KPI + แนวทางการวิเคราะห์_pages-to-jpg-0001" src="https://github.com/user-attachments/assets/cf8444fc-a94c-4432-8cab-c3cf0fad6110" />
+<img width="2481" height="3509" alt="Business Questions + KPI + แนวทางการวิเคราะห์_pages-to-jpg-0002" src="https://github.com/user-attachments/assets/ea15bdf4-29b8-43d6-93c8-6505c153b4cb" />
+<img width="2481" height="3509" alt="Business Questions + KPI + แนวทางการวิเคราะห์_pages-to-jpg-0003" src="https://github.com/user-attachments/assets/9e8f2368-7207-4d4a-b6fd-df03043f1989" />
 
 ## Multidimensional Data Model Design (ต้นข้าว)
 เริ่มจากการวิเคราะห์ข้อมูลจากระบบขายปลีกที่ประกอบด้วยไฟล์ข้อมูล 12 ตาราง ได้แก่ Categories, Customers, Employees, Order Items, Orders, Payments, Products, Promotions, Returns, Shipments, Stores และ Suppliers
