@@ -198,6 +198,9 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 
 ## Business Questions (ฟีฟ่า)
 
+<img width="2481" height="3509" alt="Business Questions + KPI + แนวทางการวิเคราะห์_pages-to-jpg-0001" src="https://github.com/user-attachments/assets/9e722ba4-a7f5-4f9a-b15c-2656578d17d0" />
+<img width="2481" height="3509" alt="Business Questions + KPI + แนวทางการวิเคราะห์_pages-to-jpg-0002" src="https://github.com/user-attachments/assets/82c15f58-89e1-46f5-8bcd-47866d7e536e" />
+<img width="2481" height="3509" alt="Business Questions + KPI + แนวทางการวิเคราะห์_pages-to-jpg-0003" src="https://github.com/user-attachments/assets/0afbc732-5f5c-4ae6-8092-93bda6e92caf" />
 
 
 ## Multidimensional Data Model Design (ต้นข้าว)
