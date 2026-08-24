@@ -513,38 +513,15 @@ supplier_id ใช้ระบุว่าสินค้าได้รับ�
 
 จากการตรวจสอบเบื้องต้นพบว่า Dataset หลัก ไม่พบ Missing Value และไม่พบ Duplicate Records ในระดับทั้งแถว ข้อมูลมีโครงสร้างหลายตารางที่สามารถเชื่อมโยงกันด้วย Key ต่าง ๆ เช่น` customer_id`, `order_id`, `product_id`, `category_id` และ` supplier_id` จึงมีความเหมาะสมสำหรับนำไปใช้ในขั้นตอนการวิเคราะห์ข้อมูลและการสร้างระบบรายงานต่อไป
 สรุปกระบวนการแบบสั้น
-                    DATASET
-                       │
-                       ▼
-                ┌─────────────┐
-                │   EXTRACT   │
-                │ Google Drive│
-                │ → Colab     │
-                └──────┬──────┘
-                       │
-                       ▼
-                ┌─────────────┐
-                │    LOAD     │
-                │ Target DB   │
-                │ เก็บ Raw Data│
-                └──────┬──────┘
-                       │
-                       ▼
-                ┌─────────────┐
-                │  TRANSFORM  │
-                │ • Data Type │
-                │ • Missing   │
-                │ • Duplicate │
-                │ • Key       │
-                │ • Join      │
-                │ • Calculate │
-                └──────┬──────┘
-                       │
-                       ▼
-                ┌─────────────┐
-                │   OUTPUT    │
-                │ Data พร้อม  │
-                │ วิเคราะห์   │
-                └─────────────┘
+                  
+**ถ้าต้องการแบบเรียบ ๆ ไม่มีการกำหนดสี** เพื่อให้เข้ากับ README ทุกธีม ใช้อันนี้จะเหมาะกว่า:
 
+```markdown
+## ELT Process
 
+```mermaid
+flowchart TD
+    A["DATASET"] --> B["EXTRACT<br/>Google Drive → Colab"]
+    B --> C["LOAD<br/>Target DB<br/>เก็บ Raw Data"]
+    C --> D["TRANSFORM<br/>• Data Type<br/>• Missing Value<br/>• Duplicate<br/>• Primary / Foreign Key<br/>• Join<br/>• Calculate"]
+    D --> E["OUTPUT<br/>Data พร้อมวิเคราะห์"]
