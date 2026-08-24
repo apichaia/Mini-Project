@@ -165,7 +165,7 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 
 
 ## ER Diagram (หลิน)
-<img src="./readme_images/miniproject Diagram.Drawio.png">
+<img src="./readme_images/miniproject Diagram.drawio.png">
 ## Database Relationships
 
 | Table | Relationship | Table |
