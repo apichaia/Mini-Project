@@ -241,7 +241,7 @@ def main():
                 total_orders=("order_id", "nunique")
             )
             promo_df["discount_percent"] = (promo_df["discount_rate"] * 100).astype(int).astype(str) + "%"
-            p_chart = alt.Chart(promo_df).mark_bar(cornerRadiusTop=6, color="#f59e0b").encode(
+            p_chart = alt.Chart(promo_df).mark_bar(cornerRadiusEnd=6, color="#f59e0b").encode(
                 x=alt.X("discount_percent:N", title="อัตราส่วนลด"),
                 y=alt.Y("total_revenue:Q", title="ยอดขายรวม ($)"),
                 tooltip=["discount_percent", alt.Tooltip("total_revenue:Q", format="$,.2f"), "total_orders"]
