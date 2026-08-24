@@ -58,13 +58,17 @@ OLTP (Online Transaction Processing) หรือ ระบบประมวล
 
 ข้อมูลหลักเป็นข้อมูลที่ใช้ประกอบการทำธุรกรรมและไม่ได้เกิดขึ้นใหม่ทุกครั้งที่มีการซื้อสินค้า ประกอบด้วยตารางต่าง ๆ ดังนี้
 
--`customers     ใช้จัดเก็บข้อมูลลูกค้า      เช่น customer_id, city และ signup_date มีจำนวน 50,000 Records`
--`products      ใช้จัดเก็บข้อมูลสินค้า      เช่น product_id, category_id, supplier_id และ price มีจำนวน 10,000 Records`
--categories    ใช้จัดเก็บประเภทสินค้า         มีจำนวน 30 Records
--suppliers     ใช้จัดเก็บข้อมูลผู้จัดจำหน่าย     มีจำนวน 200 Records
--stores        ใช้จัดเก็บข้อมูลสาขา          มีจำนวน 100 Records
--employees     ใช้จัดเก็บข้อมูลพนักงาน        มีจำนวน 1,000 Records
--promotions    ใช้จัดเก็บข้อมูลโปรโมชั่น       มีจำนวน 50 Records
+## รายละเอียดตารางข้อมูลหลัก
+
+| ตาราง | รายละเอียด | ตัวอย่างข้อมูล | จำนวน Records |
+|:---:|:---|:---|---:|
+| `customers` | ใช้จัดเก็บข้อมูลลูกค้า | `customer_id`, `city`, `signup_date` | 50,000 |
+| `products` | ใช้จัดเก็บข้อมูลสินค้า | `product_id`, `category_id`, `supplier_id`, `price` | 10,000 |
+| `categories` | ใช้จัดเก็บข้อมูลประเภทสินค้า | `category_id`, `category_name` | 30 |
+| `suppliers` | ใช้จัดเก็บข้อมูลผู้จัดจำหน่าย | `supplier_id`, `supplier_name` | 200 |
+| `stores` | ใช้จัดเก็บข้อมูลสาขา | `store_id`, `store_name` | 100 |
+| `employees` | ใช้จัดเก็บข้อมูลพนักงาน | `employee_id`, `employee_name`, `store_id` | 1,000 |
+| `promotions` | ใช้จัดเก็บข้อมูลโปรโมชั่น | `promotion_id`, `promotion_name` | 50 |
 
 ข้อมูลเหล่านี้จะถูกนำมาใช้ประกอบการทำธุรกรรม เช่น เมื่อมีการสั่งซื้อสินค้า ระบบจะนำข้อมูลลูกค้า สินค้า สาขา และโปรโมชั่นที่เกี่ยวข้องมาเชื่อมโยงกับคำสั่งซื้อ
 
@@ -72,12 +76,22 @@ OLTP (Online Transaction Processing) หรือ ระบบประมวล
 
 ข้อมูลธุรกรรมเป็นข้อมูลที่เกิดขึ้นจากกิจกรรมต่าง ๆ ของระบบ โดยมีการเพิ่มข้อมูลเมื่อเกิดเหตุการณ์ใหม่ เช่น การสั่งซื้อ การชำระเงิน หรือการจัดส่ง ประกอบด้วย
 
-orders ใช้บันทึกข้อมูลคำสั่งซื้อ ประกอบด้วย order_id, customer_id, store_id, order_date และ promotion_id มีจำนวน 300,000 Records
-order_items ใช้บันทึกรายละเอียดสินค้าในแต่ละคำสั่งซื้อ ประกอบด้วย order_item_id, order_id, product_id, qty และ price มีจำนวน 600,000 Records
-payments ใช้บันทึกข้อมูลการชำระเงิน ประกอบด้วย payment_id, order_id และ amount มีจำนวน 300,000 Records
-shipments ใช้บันทึกข้อมูลการจัดส่ง ประกอบด้วย shipment_id, order_id และ status มีจำนวน 300,000 Records
-returns ใช้บันทึกข้อมูลการคืนสินค้า ประกอบด้วย return_id, order_item_id และ refund มีจำนวน 30,000 Records
+## รายละเอียดตารางข้อมูล
 
+| ตาราง | รายละเอียด | ตัวอย่างข้อมูล | จำนวน Records |
+|:---:|:---|:---|---:|
+| `customers` | ใช้จัดเก็บข้อมูลลูกค้า | `customer_id`, `city`, `signup_date` | 50,000 |
+| `products` | ใช้จัดเก็บข้อมูลสินค้า | `product_id`, `category_id`, `supplier_id`, `price` | 10,000 |
+| `categories` | ใช้จัดเก็บข้อมูลประเภทสินค้า | `category_id`, `category_name` | 30 |
+| `suppliers` | ใช้จัดเก็บข้อมูลผู้จัดจำหน่าย | `supplier_id`, `supplier_name` | 200 |
+| `stores` | ใช้จัดเก็บข้อมูลสาขา | `store_id`, `store_name` | 100 |
+| `employees` | ใช้จัดเก็บข้อมูลพนักงาน | `employee_id`, `employee_name`, `store_id` | 1,000 |
+| `promotions` | ใช้จัดเก็บข้อมูลโปรโมชั่น | `promotion_id`, `promotion_name` | 50 |
+| `orders` | ใช้บันทึกข้อมูลคำสั่งซื้อ | `order_id`, `customer_id`, `store_id`, `order_date`, `promotion_id` | 300,000 |
+| `order_items` | ใช้บันทึกรายละเอียดสินค้าในแต่ละคำสั่งซื้อ | `order_item_id`, `order_id`, `product_id`, `qty`, `price` | 600,000 |
+| `payments` | ใช้บันทึกข้อมูลการชำระเงิน | `payment_id`, `order_id`, `amount` | 300,000 |
+| `shipments` | ใช้บันทึกข้อมูลการจัดส่ง | `shipment_id`, `order_id`, `status` | 300,000 |
+| `returns` | ใช้บันทึกข้อมูลการคืนสินค้า | `return_id`, `order_item_id`, `refund` | 30,000 |
 ตารางเหล่านี้มีความสำคัญต่อระบบ OLTP เนื่องจากเป็นข้อมูลที่เกิดขึ้นจากธุรกรรมโดยตรงและมีการบันทึกข้อมูลเป็นรายรายการ
 
 3.3 กระบวนการทำงานของ OLTP ใน Dataset
@@ -183,9 +197,7 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 | stores | 1:N | employees |
 
 ## Business Questions (ฟีฟ่า)
-<img width="2481" height="3509" alt="Business Questions + KPI + แนวทางการวิเคราะห์_pages-to-jpg-0001" src="https://github.com/user-attachments/assets/cf8444fc-a94c-4432-8cab-c3cf0fad6110" />
-<img width="2481" height="3509" alt="Business Questions + KPI + แนวทางการวิเคราะห์_pages-to-jpg-0002" src="https://github.com/user-attachments/assets/ea15bdf4-29b8-43d6-93c8-6505c153b4cb" />
-<img width="2481" height="3509" alt="Business Questions + KPI + แนวทางการวิเคราะห์_pages-to-jpg-0003" src="https://github.com/user-attachments/assets/9e8f2368-7207-4d4a-b6fd-df03043f1989" />
+
 
 ## Multidimensional Data Model Design (ต้นข้าว)
 เริ่มจากการวิเคราะห์ข้อมูลจากระบบขายปลีกที่ประกอบด้วยไฟล์ข้อมูล 12 ตาราง ได้แก่ Categories, Customers, Employees, Order Items, Orders, Payments, Products, Promotions, Returns, Shipments, Stores และ Suppliers
@@ -390,55 +402,75 @@ shipments
 
 เนื่องจาก Dataset มีลักษณะเป็นข้อมูลหลายตาราง จึงต้องตรวจสอบความสัมพันธ์ระหว่างตารางด้วย โดยใช้รหัสที่เชื่อมโยงระหว่างตาราง เช่น
 
-8.1 Customers และ Orders
-customers
-customer_id
-      │
-      ▼
-orders
-customer_id
+## 8. ความสัมพันธ์ระหว่างตาราง
 
-customer_id ในตาราง orders ใช้เชื่อมโยงไปยัง customer_id ในตาราง customers
+### 8.1 Customers และ Orders
 
-8.2 Orders และ Order Items
-orders
-order_id
-      │
-      ▼
-order_items
-order_id
+| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
+|:---|:---:|:---|:---:|:---|
+| `customers` | `customer_id` | `orders` | `customer_id` | `customer_id` ในตาราง `orders` ใช้เชื่อมโยงไปยัง `customer_id` ในตาราง `customers` |
 
-order_id ใช้เชื่อมโยงคำสั่งซื้อกับรายละเอียดสินค้าที่อยู่ภายในคำสั่งซื้อนั้น
+**ความสัมพันธ์**
 
-8.3 Products และ Order Items
-products
-product_id
-      │
-      ▼
-order_items
-product_id
+`customers.customer_id`  
+↓  
+`orders.customer_id`
 
-product_id ใช้เชื่อมโยงข้อมูลสินค้าเข้ากับรายการสินค้าในการสั่งซื้อ
+---
 
-8.4 Products และ Categories
-categories
-category_id
-      │
-      ▼
-products
-category_id
+### 8.2 Orders และ Order Items
 
-category_id ใช้ระบุว่าสินค้าแต่ละรายการอยู่ในหมวดหมู่ใด
+| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
+|:---|:---:|:---|:---:|:---|
+| `orders` | `order_id` | `order_items` | `order_id` | `order_id` ใช้เชื่อมโยงคำสั่งซื้อกับรายละเอียดสินค้าที่อยู่ภายในคำสั่งซื้อนั้น |
 
-8.5 Products และ Suppliers
-suppliers
-supplier_id
-      │
-      ▼
-products
-supplier_id
+**ความสัมพันธ์**
 
-supplier_id ใช้ระบุว่าสินค้าได้รับการจัดหาจากผู้จัดจำหน่ายรายใด
+`orders.order_id`  
+↓  
+`order_items.order_id`
+
+---
+
+### 8.3 Products และ Order Items
+
+| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
+|:---|:---:|:---|:---:|:---|
+| `products` | `product_id` | `order_items` | `product_id` | `product_id` ใช้เชื่อมโยงข้อมูลสินค้าเข้ากับรายการสินค้าในการสั่งซื้อ |
+
+**ความสัมพันธ์**
+
+`products.product_id`  
+↓  
+`order_items.product_id`
+
+---
+
+### 8.4 Products และ Categories
+
+| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
+|:---|:---:|:---|:---:|:---|
+| `categories` | `category_id` | `products` | `category_id` | `category_id` ใช้ระบุว่าสินค้าแต่ละรายการอยู่ในหมวดหมู่ใด |
+
+**ความสัมพันธ์**
+
+`categories.category_id`  
+↓  
+`products.category_id`
+
+---
+
+### 8.5 Products และ Suppliers
+
+| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
+|:---|:---:|:---|:---:|:---|
+| `suppliers` | `supplier_id` | `products` | `supplier_id` | `supplier_id` ใช้ระบุว่าสินค้าได้รับการจัดหาจากผู้จัดจำหน่ายรายใด |
+
+**ความสัมพันธ์**
+
+`suppliers.supplier_id`  
+↓  
+`products.supplier_id`
 
 9. การ Transform ข้อมูลวันที่
 
@@ -516,14 +548,16 @@ supplier_id ใช้ระบุว่าสินค้าได้รับ�
 จากการตรวจสอบเบื้องต้นพบว่า Dataset หลัก ไม่พบ Missing Value และไม่พบ Duplicate Records ในระดับทั้งแถว ข้อมูลมีโครงสร้างหลายตารางที่สามารถเชื่อมโยงกันด้วย Key ต่าง ๆ เช่น` customer_id`, `order_id`, `product_id`, `category_id` และ` supplier_id` จึงมีความเหมาะสมสำหรับนำไปใช้ในขั้นตอนการวิเคราะห์ข้อมูลและการสร้างระบบรายงานต่อไป
 สรุปกระบวนการแบบสั้น
                   
-**ถ้าต้องการแบบเรียบ ๆ ไม่มีการกำหนดสี** เพื่อให้เข้ากับ README ทุกธีม ใช้อันนี้จะเหมาะกว่า:
-
-```markdown
 ## ELT Process
 
-```mermaid
-flowchart TD
-    A["DATASET"] --> B["EXTRACT<br/>Google Drive → Colab"]
-    B --> C["LOAD<br/>Target DB<br/>เก็บ Raw Data"]
-    C --> D["TRANSFORM<br/>• Data Type<br/>• Missing Value<br/>• Duplicate<br/>• Primary / Foreign Key<br/>• Join<br/>• Calculate"]
-    D --> E["OUTPUT<br/>Data พร้อมวิเคราะห์"]
+| ขั้นตอน | กระบวนการ | รายละเอียด |
+|:---:|:---|:---|
+| **1** | 📂 **DATASET** | ข้อมูลต้นทาง (Dataset) |
+| ↓ | ↓ | ↓ |
+| **2** | 📥 **EXTRACT** | ดึงข้อมูลจาก **Google Drive → Google Colab** |
+| ↓ | ↓ | ↓ |
+| **3** | 💾 **LOAD** | โหลดข้อมูลเข้าสู่ **Target Database** และเก็บข้อมูลในรูปแบบ **Raw Data** |
+| ↓ | ↓ | ↓ |
+| **4** | ⚙️ **TRANSFORM** | ตรวจสอบและปรับปรุงข้อมูล ได้แก่ Data Type, Missing Value, Duplicate, Primary Key, Foreign Key, Join และ Calculate |
+| ↓ | ↓ | ↓ |
+| **5** | 📊 **OUTPUT** | ได้ข้อมูลที่ผ่านการตรวจสอบและ Transform พร้อมสำหรับการวิเคราะห์ |
