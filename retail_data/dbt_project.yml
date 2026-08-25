@@ -36,3 +36,5 @@ models:
       +materialized: view
     staging:
       +materialized: table
+    datawrangling:
+      +materialized: table
