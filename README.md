@@ -233,8 +233,8 @@ Measure
 - Sales Amount (ยอดขาย) จำนวนเงินรวมหลังหักส่วนลด หรือราคาสุทธิ
 - Discount (ส่วนลด) มูลค่าส่วนลดที่ให้ในรายการนั้น
 - Profit (กำไรสุทธิ) กำไรสุทธิจากรายการนั้น
-- Calculated MeasuresProfit Margin (%):
-  - ("Profit" /"Sales Amount" )×100
+- Calculated Measures
+  - Profit Margin (%):("Profit" /"Sales Amount" )×100
   - Average Selling Price (ราคาขายเฉลี่ยต่อชิ้น): "Sales Amount"/"Quantity" 
 
 ## Data Model Diagram (Star Scheme) แซนด์วิช
