@@ -19,7 +19,7 @@ For Datawarehouse
 
    มีวัตถุประสงค์เพื่อออกแบบและพัฒนาระบบคลังข้อมูลสำหรับธุรกิจค้าปลีก โดยนำข้อมูลจากฐานข้อมูลปฏิบัติการ (OLTP) มาผ่านกระบวนการ ETL/ELT เพื่อทำความสะอาดและแปลงข้อมูล จากนั้นจัดเก็บข้อมูลใน Data Warehouse ที่ออกแบบด้วยแนวคิด Dimensional Modeling และ Star Schema ประกอบด้วย Fact Table และ Dimension Tables เพื่อรองรับการวิเคราะห์ข้อมูลในมิติต่าง ๆ เช่น เวลา สินค้า ลูกค้า และสาขา ระบบจะนำข้อมูลจาก Data Warehouse มาวิเคราะห์ด้วยแนวคิด OLAP และพัฒนา Interactive Dashboard เพื่อแสดงยอดขาย จำนวนคำสั่งซื้อ กำไร สินค้าขายดี และตัวชี้วัดทางธุรกิจอื่น ๆ สำหรับสนับสนุนการตัดสินใจทางธุรกิจ
 
-### Dataset & Operational Database
+### 1. Dataset & Operational Database
 ความหมายของ Dataset
 
 1. Dataset คือชุดข้อมูลที่นำมาใช้ในการทำโครงงาน โดย Dataset นี้เป็นข้อมูลเกี่ยวกับ การขายสินค้าและการดำเนินงานของร้านค้าปลีก (Retail) ซึ่งประกอบด้วยข้อมูลลูกค้า สินค้า ร้านค้า คำสั่งซื้อ การชำระเงิน การจัดส่ง และการคืนสินค้า
@@ -166,7 +166,7 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 
 
 
-## ER Diagram (หลิน) 
+## 2. ER Diagram (หลิน) 
 <img src="./readme_images/miniproject Diagram.drawio.png">
 ## Database Relationships
 
@@ -187,55 +187,366 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 ## Business Questions (ฟีฟ่า)
 
 
-## Multidimensional Data Model Design (ต้นข้าว)
-เริ่มจากการวิเคราะห์ข้อมูลจากระบบขายปลีกที่ประกอบด้วยไฟล์ข้อมูล 12 ตาราง ได้แก่ Categories, Customers, Employees, Order Items, Orders, Payments, Products, Promotions, Returns, Shipments, Stores และ Suppliers
-จากนั้นกำหนด Business Process หลัก คือ กระบวนการขายสินค้า (Sales Process) เนื่องจากเป็นกระบวนการที่เชื่อมโยงข้อมูลส่วนใหญ่ของระบบ เช่น ลูกค้า สินค้า ร้านค้า พนักงาน โปรโมชั่น การชำระเงิน และการจัดส่งสินค้า
-จากนั้นแยกข้อมูลเชิงพรรณนาออกเป็น Dimension Tables และเก็บข้อมูลเชิงตัวเลขที่ใช้วิเคราะห์ไว้ใน Fact Table
-- Dim_Date: Day → Month → Quarter → Year
-ใช้ในการดูยอดขายแต่ละวัน เดือน ไตรมาส และปี
-- Dim_Product: Category → Sub-Category
-ใช้ในการจัดหมวดหมู่ผลิตภัณฑ์
-- Dim_Customer: Customer
-ใช้ในการวิเคราะห์พฤติกรรมของลูกค้า
-- Dim_Store: Store → District → Province → Region
-ใช้ในการวิเคราะห์ผลการดำเนินงานรายสาขาและพื้นที่
-- Dim_Employee: Employee
-ใช้ในการวิเคราะห์พฤติกรรมการทำงานของพนักงาน
-- Dim_Promotion: Promotion => Discount, Special Deal, Cupon, Point
-ใช้ในการวิเคราะห์ส่วนของโปรโมชั่น เช่น ส่วนลด ของแถม ดีล คูปอง และ พอยท์
-- Dim_Supplier: Supplier
-ใช้ในการวิเคราะห์เรื่องซัพพลายเออร์,การจัดการทรัพยากร
-- Dim_Payment: Payment Method ใช้ในการวิเคราห์วิธีการชำระเงินของลูกค้า
+## ## 3. Business Process and Multidimensional Data Model
 
-ในส่วนของ Fact Tables [Fact_Sales] จะมี Source หลักๆ คือ
-- Order_items.csv
-- Orders.csv
+### 3.1 Business Process
 
-ในส่วนไฟล์ข้อมูล Returns และ Shipments สามารถนำมาสร้างเป็น Fact แยกออกมา
-- Returns  → Fact_Returns เพื่อวิเคราะห์อัตราการคืนสินค้า (Return Rate) ตามสาขา หรือตามประเภทสินค้า
-- Shipments  →  Fact_Shipments เพื่อวัดประสิทธิภาพระยะเวลาจัดส่ง (Delivery Lead Time) และคลังสินค้า
+จากการวิเคราะห์ระบบขายปลีก พบว่าข้อมูลสามารถแบ่งออกเป็นกระบวนการทางธุรกิจหลักที่เกี่ยวข้องกับการวิเคราะห์ใน Dashboard ดังนี้
 
-กำหนด Grain ของ Fact Table ว่า
-	“1 แถว แทนสินค้า 1 รายการในคำสั่งซื้อ 1 รายการ (One Order Line Item)”
+#### 1. Sales Process
 
-Foreign Keys:
-- Date_ID
-- Product_ID
-- Customer_ID
-- Store_ID
-- Employee_ID
-- Promotion_ID
-- Supplier_ID
-- Payment_ID
+กระบวนการขายสินค้าเป็น Business Process หลักของระบบ โดยใช้ข้อมูลจาก `Orders` และ `Order Items` เพื่อวิเคราะห์ยอดขาย จำนวนสินค้าที่ขาย รายได้ตามสินค้า หมวดหมู่ ลูกค้า ร้านค้า โปรโมชั่น และซัพพลายเออร์
 
-Measure
-- Quantity (จำนวนสินค้า) จำนวนชิ้นที่ขายได้ในรายการนั้น
-- Sales Amount (ยอดขาย) จำนวนเงินรวมหลังหักส่วนลด หรือราคาสุทธิ
-- Discount (ส่วนลด) มูลค่าส่วนลดที่ให้ในรายการนั้น
-- Profit (กำไรสุทธิ) กำไรสุทธิจากรายการนั้น
-- Calculated Measures
-  - Profit Margin (%):("Profit" /"Sales Amount" )×100
-  - Average Selling Price (ราคาขายเฉลี่ยต่อชิ้น): "Sales Amount"/"Quantity" 
+ข้อมูลหลักที่เกี่ยวข้อง:
+- `Orders`
+- `Order Items`
+- `Products`
+- `Categories`
+- `Customers`
+- `Stores`
+- `Promotions`
+- `Suppliers`
+
+ตัวชี้วัดสำคัญ:
+- Total Sales / Revenue
+- Monthly Revenue
+- Product Revenue
+- Units Sold
+- Category Revenue
+- Store Revenue
+- Customer Revenue
+- Average Order Value (AOV)
+- Sales Growth Rate
+- Promotion Revenue
+- Supplier Revenue
+
+Grain ของ Sales Process:
+
+> 1 แถวใน Fact_Sales แทนสินค้า 1 รายการใน 1 Order Line Item (One Order Line Item)
+
+
+#### 2. Return Process
+
+กระบวนการคืนสินค้าใช้ข้อมูลจาก `Returns` ซึ่งเชื่อมโยงกับ `Order Items` เพื่อวิเคราะห์จำนวนและมูลค่าการคืนสินค้า รวมถึงใช้เปรียบเทียบกับยอดขายเพื่อคำนวณ Return Rate
+
+ข้อมูลหลักที่เกี่ยวข้อง:
+- `Returns`
+- `Order Items`
+- `Orders`
+- `Products`
+- `Customers`
+- `Stores`
+
+ตัวชี้วัดสำคัญ:
+- Returned Quantity
+- Refund Amount
+- Return Rate
+
+Grain ของ Return Process:
+
+> 1 แถวใน Fact_Returns แทน 1 รายการการคืนสินค้า (One Return Transaction)
+
+หมายเหตุ: ตาราง `Returns` ในระบบไม่มีข้อมูลสาเหตุการคืนสินค้า (`return_reason`) ดังนั้นไม่สามารถวิเคราะห์ Return Rate by Reason ได้จากข้อมูลปัจจุบัน
+
+
+#### 3. Shipment Process
+
+กระบวนการจัดส่งสินค้าใช้ข้อมูลจาก `Shipments` ซึ่งเชื่อมโยงกับ `Orders` เพื่อวิเคราะห์สถานะของการจัดส่งสินค้า
+
+ข้อมูลหลักที่เกี่ยวข้อง:
+- `Shipments`
+- `Orders`
+- `Customers`
+- `Stores`
+
+ตัวชี้วัด/ข้อมูลที่สามารถวิเคราะห์ได้:
+- Shipment Status
+- จำนวน Shipment ตามสถานะ
+- สัดส่วน Shipment ตามสถานะ
+
+Grain ของ Shipment Process:
+
+> 1 แถวใน Fact_Shipments แทน 1 รายการจัดส่งสินค้า (One Shipment)
+
+หมายเหตุ: ตาราง `Shipments` มีเพียง `shipment_id`, `order_id` และ `status` ไม่มีข้อมูลวันที่คาดว่าจะจัดส่งหรือวันที่จัดส่งจริง ดังนั้นจึงไม่สามารถคำนวณ On-Time Delivery Rate หรือ Average Delivery Time ได้จากข้อมูลปัจจุบัน
+
+
+#### 4. Payment Process
+
+กระบวนการชำระเงินใช้ข้อมูลจาก `Payments` ซึ่งเชื่อมโยงกับ `Orders` เพื่อวิเคราะห์จำนวนเงินที่ชำระในแต่ละรายการ
+
+ข้อมูลหลักที่เกี่ยวข้อง:
+- `Payments`
+- `Orders`
+
+ตัวชี้วัดสำคัญ:
+- Payment Amount
+- Number of Payment Transactions
+
+Grain ของ Payment Process:
+
+> 1 แถวใน Fact_Payments แทน 1 รายการธุรกรรมการชำระเงิน (One Payment Transaction)
+
+หมายเหตุ: ตาราง `Payments` ไม่มีข้อมูล `payment_method` ดังนั้นไม่สามารถวิเคราะห์ Payment Method Usage ตามประเภทวิธีการชำระเงินได้จากข้อมูลปัจจุบัน.
+
+
+---
+
+### 3.2 Multidimensional Data Model
+
+จาก Business Process ที่วิเคราะห์ สามารถออกแบบ Multidimensional Data Model โดยแบ่งข้อมูลออกเป็น Fact Tables และ Dimension Tables เพื่อรองรับการวิเคราะห์ข้อมูลใน Dashboard
+
+#### Fact Tables
+
+ระบบประกอบด้วย Fact Tables หลัก 4 ตาราง ได้แก่
+
+##### Fact_Sales
+
+ใช้เก็บข้อมูลเชิงตัวเลขที่เกี่ยวข้องกับการขายสินค้า
+
+**Grain:**
+> 1 แถว = 1 สินค้าใน 1 Order Line Item
+
+**Foreign Keys:**
+- `date_id`
+- `product_id`
+- `customer_id`
+- `store_id`
+- `promotion_id`
+- `supplier_id`
+
+**Degenerate/Reference Keys:**
+- `order_id`
+- `order_item_id`
+
+**Measures:**
+- `quantity` — จำนวนสินค้าที่ขาย
+- `unit_price` — ราคาต่อหน่วย
+- `sales_amount` — มูลค่าการขาย
+- `discount` — ส่วนลด
+
+Calculated Measures:
+- `Average Selling Price = Sales Amount / Quantity`
+- `Sales Growth Rate`
+- `Average Order Value (AOV)`
+- `Profit Margin` หากมีข้อมูลต้นทุน/กำไรเพิ่มเติมในข้อมูลต้นทาง
+
+
+##### Fact_Returns
+
+ใช้เก็บข้อมูลการคืนสินค้า
+
+**Grain:**
+> 1 แถว = 1 Return Transaction
+
+**Foreign Keys:**
+- `product_id`
+- `customer_id`
+- `store_id`
+
+**Reference Keys:**
+- `return_id`
+- `order_item_id`
+
+**Measures:**
+- `refund` — จำนวนเงินคืนสินค้า
+- `returned_quantity` หากสามารถคำนวณหรือมีข้อมูลจำนวนสินค้าที่คืนจากข้อมูลต้นทาง
+
+Calculated Measure:
+- `Return Rate = Returned Quantity / Sold Quantity × 100`
+
+หมายเหตุ: ตาราง `Returns` มีเพียง `return_id`, `order_item_id` และ `refund` จึงไม่มีข้อมูล `return_reason` และไม่มีวันที่คืนสินค้าโดยตรง
+
+
+##### Fact_Shipments
+
+ใช้เก็บข้อมูลการจัดส่งสินค้า
+
+**Grain:**
+> 1 แถว = 1 Shipment
+
+**Foreign Keys / Reference Keys:**
+- `order_id`
+- `customer_id`
+- `store_id`
+
+**Measures / Attributes:**
+- `status` — สถานะการจัดส่ง
+
+เนื่องจากข้อมูลต้นทางไม่มีวันที่จัดส่งหรือวันที่คาดว่าจะจัดส่ง จึงไม่สามารถคำนวณ Delivery Lead Time และ On-Time Delivery Rate ได้
+
+
+##### Fact_Payments
+
+ใช้เก็บข้อมูลธุรกรรมการชำระเงิน
+
+**Grain:**
+> 1 แถว = 1 Payment Transaction
+
+**Reference Keys:**
+- `payment_id`
+- `order_id`
+
+**Measure:**
+- `amount` — จำนวนเงินที่ชำระ
+
+หมายเหตุ: ไม่มี `payment_method` ในตาราง Payments ดังนั้นไม่สามารถวิเคราะห์การใช้งานวิธีการชำระเงินแต่ละประเภทได้
+
+
+---
+
+### 3.3 Dimension Tables
+
+#### Dim_Date
+
+ใช้สำหรับวิเคราะห์ข้อมูลตามช่วงเวลา
+
+**Primary Key:**
+- `date_id`
+
+**Attributes:**
+- `day`
+- `month`
+- `quarter`
+- `year`
+
+Hierarchy:
+
+> Year → Quarter → Month → Day
+
+ใช้สำหรับการวิเคราะห์:
+- Daily Sales
+- Monthly Revenue
+- Quarterly Revenue
+- Yearly Revenue
+- Sales Growth Rate
+
+
+#### Dim_Product
+
+ใช้สำหรับวิเคราะห์ข้อมูลตามสินค้าและหมวดหมู่สินค้า
+
+**Primary Key:**
+- `product_id`
+
+**Attributes:**
+- `category_id`
+- `category_name`
+- `supplier_id`
+- `price`
+
+โดยข้อมูล `category_name` มาจากตาราง `Categories` และนำมารวมไว้ใน Dim_Product เพื่อให้โครงสร้างสามารถรองรับ Star Schema ได้โดยไม่ต้องเชื่อมต่อ Dimension ผ่าน Dimension อีกชั้นหนึ่ง
+
+
+#### Dim_Customer
+
+ใช้สำหรับวิเคราะห์พฤติกรรมและรายได้ของลูกค้า
+
+**Primary Key:**
+- `customer_id`
+
+**Attributes:**
+- `city`
+- `signup_date`
+
+
+#### Dim_Store
+
+ใช้สำหรับวิเคราะห์ผลการดำเนินงานของแต่ละสาขา
+
+**Primary Key:**
+- `store_id`
+
+**Attributes:**
+- `city`
+
+Hierarchy:
+
+> Store → City
+
+
+#### Dim_Promotion
+
+ใช้สำหรับวิเคราะห์ผลของโปรโมชั่นต่อยอดขาย
+
+**Primary Key:**
+- `promotion_id`
+
+**Attributes:**
+- `discount`
+
+ใช้ในการวิเคราะห์:
+- Promotion Revenue
+- Promotion Performance
+- Promotion Lift
+
+
+#### Dim_Supplier
+
+ใช้สำหรับวิเคราะห์ข้อมูลของ Supplier
+
+**Primary Key:**
+- `supplier_id`
+
+**Attributes:**
+- `country`
+
+ใช้ในการวิเคราะห์ Supplier Revenue
+
+
+#### Dim_Employee
+
+ใช้สำหรับวิเคราะห์ข้อมูลพนักงานและความสัมพันธ์กับสาขา
+
+**Primary Key:**
+- `employee_id`
+
+**Attributes:**
+- `store_id`
+- `salary`
+
+หมายเหตุ: ใน ER Diagram พนักงานเชื่อมโยงกับ Store แต่ไม่มีความสัมพันธ์โดยตรงกับ Orders ดังนั้นไม่สามารถใช้ข้อมูลนี้เพื่อคำนวณ Sales per Employee ได้โดยตรง
+
+
+---
+
+### 3.4 Summary of Fact and Dimension Tables
+
+| Table | Type | Grain / Purpose |
+|---|---|---|
+| `Fact_Sales` | Fact | 1 Order Line Item |
+| `Fact_Returns` | Fact | 1 Return Transaction |
+| `Fact_Shipments` | Fact | 1 Shipment |
+| `Fact_Payments` | Fact | 1 Payment Transaction |
+| `Dim_Date` | Dimension | วิเคราะห์ตามช่วงเวลา |
+| `Dim_Product` | Dimension | วิเคราะห์สินค้าและหมวดหมู่ |
+| `Dim_Customer` | Dimension | วิเคราะห์ลูกค้า |
+| `Dim_Store` | Dimension | วิเคราะห์สาขา |
+| `Dim_Promotion` | Dimension | วิเคราะห์โปรโมชั่น |
+| `Dim_Supplier` | Dimension | วิเคราะห์ Supplier |
+| `Dim_Employee` | Dimension | วิเคราะห์ข้อมูลพนักงาน |
+
+---
+
+### 3.5 Overall Multidimensional Model
+
+Multidimensional Data Model ของระบบประกอบด้วยหลาย Fact Tables ที่ใช้ Dimension ร่วมกัน โดย `Fact_Sales` เป็น Fact หลักสำหรับการวิเคราะห์ยอดขาย และมี `Fact_Returns`, `Fact_Shipments` และ `Fact_Payments` สำหรับรองรับกระบวนการคืนสินค้า การจัดส่ง และการชำระเงินตามลำดับ
+
+Dimension ที่สามารถใช้ร่วมกันระหว่างหลาย Fact Tables ได้แก่ `Dim_Date`, `Dim_Product`, `Dim_Customer` และ `Dim_Store` ซึ่งช่วยให้สามารถวิเคราะห์ข้อมูลจากหลาย Business Processes ในมุมมองเดียวกัน
+
+โครงสร้างโดยรวมสามารถอธิบายได้ว่าเป็น **Fact Constellation / Galaxy Schema** ซึ่งประกอบด้วยหลาย Star Schemas ที่ใช้ Conformed Dimensions ร่วมกัน
+
+```text
+                         Dim_Date
+                       /     |      \
+                      /      |       \
+                     ▼       ▼        ▼
+              Fact_Sales  Fact_Returns  Fact_Shipments
+                  │           │             │
+             Dimensions   Dimensions    Dimensions
+                  │
+                  ▼
+             Fact_Payments
 
 ## Data Model Diagram (Star Scheme) แซนด์วิช
 <img src="./readme_images/star schema.jpg">
