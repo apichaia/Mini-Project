@@ -631,7 +631,7 @@ Dimension ที่สามารถใช้ร่วมกันระหว�
 ```
 
 ### Data Model Diagram (Star Scheme) แซนด์วิช
-<img src="./readme_images/star_schema_1.jpg">
+<img src="./readme_images/StarSchema1.jpg">
 
 ## การดำเนินงานด้านการจัดการข้อมูลด้วยกระบวนการ ELT
 
