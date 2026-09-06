@@ -548,7 +548,9 @@ Dimension ที่สามารถใช้ร่วมกันระหว�
                   ▼
              Fact_Payments
 
-## Data Model Diagram (Star Scheme) แซนด์วิช
+```
+
+### Data Model Diagram (Star Scheme) แซนด์วิช
 <img src="./readme_images/star schema.jpg">
 
 ## การดำเนินงานด้านการจัดการข้อมูลด้วยกระบวนการ ELT
