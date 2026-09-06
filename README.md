@@ -583,8 +583,6 @@ Calculated Measures:
 
 ### 4.5 Summary of Fact and Dimension Tables
 
-### 3.4 Summary of Fact and Dimension Tables
-
 #### Fact Tables
 
 | Table | Grain / Purpose | Base Measures | Measure Type | Calculated Measures |
@@ -607,7 +605,6 @@ Calculated Measures:
 | `Dim_Supplier` | Dimension | `supplier_id` | `country` | วิเคราะห์ Supplier และรายได้จากสินค้า |
 | `Dim_Employee` | Dimension | `employee_id` | `store_id`, `salary` | วิเคราะห์ข้อมูลพนักงานและสาขา |
 
-> **Note:** `Return Rate` สามารถคำนวณได้ตามข้อมูลที่มีอยู่ในระบบ แต่หากต้องการคำนวณในรูปแบบ `Returned Quantity / Sold Quantity × 100` จำเป็นต้องมีข้อมูลจำนวนสินค้าที่คืน (`returned_quantity`) ซึ่งไม่มีอยู่ใน ER ปัจจุบัน
 
 ---
 
