@@ -184,12 +184,12 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 | orders | 1:N | shipments |
 | stores | 1:N | employees |
 
-## Business Questions (ฟีฟ่า)
+## 3.Business Questions (ฟีฟ่า)
 
 
-## ## 3. Business Process and Multidimensional Data Model
+## ## 4. Business Process and Multidimensional Data Model
 
-### 3.1 Business Process
+### 4.1 Business Process
 
 จากการวิเคราะห์ระบบขายปลีก พบว่าข้อมูลสามารถแบ่งออกเป็นกระบวนการทางธุรกิจหลักที่เกี่ยวข้องกับการวิเคราะห์ใน Dashboard ดังนี้
 
@@ -292,7 +292,7 @@ Grain ของ Payment Process:
 
 ---
 
-### 3.2 Multidimensional Data Model
+### 4.2 Multidimensional Data Model
 
 จาก Business Process ที่วิเคราะห์ สามารถออกแบบ Multidimensional Data Model โดยแบ่งข้อมูลออกเป็น Fact Tables และ Dimension Tables เพื่อรองรับการวิเคราะห์ข้อมูลใน Dashboard
 
@@ -300,7 +300,7 @@ Grain ของ Payment Process:
 
 ระบบประกอบด้วย Fact Tables หลัก 4 ตาราง ได้แก่
 
-##### Fact_Sales
+##### 1.Fact_Sales
 
 ใช้เก็บข้อมูลเชิงตัวเลขที่เกี่ยวข้องกับการขายสินค้า
 
@@ -332,7 +332,7 @@ Calculated Measures:
 - `Profit Margin` หากมีข้อมูลต้นทุน/กำไรเพิ่มเติมในข้อมูลต้นทาง
 
 
-##### Fact_Returns
+##### 2. Fact_Returns
 
 ใช้เก็บข้อมูลการคืนสินค้า
 
@@ -358,7 +358,7 @@ Calculated Measure:
 หมายเหตุ: ตาราง `Returns` มีเพียง `return_id`, `order_item_id` และ `refund` จึงไม่มีข้อมูล `return_reason` และไม่มีวันที่คืนสินค้าโดยตรง
 
 
-##### Fact_Shipments
+##### 3. Fact_Shipments
 
 ใช้เก็บข้อมูลการจัดส่งสินค้า
 
@@ -376,7 +376,7 @@ Calculated Measure:
 เนื่องจากข้อมูลต้นทางไม่มีวันที่จัดส่งหรือวันที่คาดว่าจะจัดส่ง จึงไม่สามารถคำนวณ Delivery Lead Time และ On-Time Delivery Rate ได้
 
 
-##### Fact_Payments
+##### 4. Fact_Payments
 
 ใช้เก็บข้อมูลธุรกรรมการชำระเงิน
 
@@ -392,10 +392,9 @@ Calculated Measure:
 
 หมายเหตุ: ไม่มี `payment_method` ในตาราง Payments ดังนั้นไม่สามารถวิเคราะห์การใช้งานวิธีการชำระเงินแต่ละประเภทได้
 
-
 ---
 
-### 3.3 Dimension Tables
+### 4.3 Dimension Tables
 
 #### Dim_Date
 
@@ -507,28 +506,112 @@ Hierarchy:
 
 หมายเหตุ: ใน ER Diagram พนักงานเชื่อมโยงกับ Store แต่ไม่มีความสัมพันธ์โดยตรงกับ Orders ดังนั้นไม่สามารถใช้ข้อมูลนี้เพื่อคำนวณ Sales per Employee ได้โดยตรง
 
+### 4.3 Measures and Measure Types
+
+Measures คือค่าตัวเลขที่ใช้ในการวิเคราะห์ข้อมูลใน Fact Tables โดยสามารถแบ่งตามลักษณะการนำไปคำนวณรวมได้เป็น Additive, Semi-Additive และ Non-Additive Measures
+
+#### 1. Fact_Sales Measures
+
+| Measure | Description | Measure Type |
+|---|---|---|
+| `quantity` | จำนวนสินค้าที่ขายในแต่ละ Order Line Item | Additive |
+| `sales_amount` | มูลค่าการขายสินค้า | Additive |
+| `unit_price` | ราคาขายต่อหน่วย | Non-Additive |
+| `discount` | มูลค่าส่วนลดจาก Promotion | Additive |
+
+Calculated Measures:
+
+| Calculated Measure | Formula | Measure Type |
+|---|---|---|
+| `Total Sales` | SUM(sales_amount) | Additive |
+| `Units Sold` | SUM(quantity) | Additive |
+| `Average Selling Price` | SUM(sales_amount) / SUM(quantity) | Non-Additive |
+| `Average Order Value (AOV)` | SUM(sales_amount) / COUNT(DISTINCT order_id) | Non-Additive |
+| `Sales Growth Rate` | ((Current Sales - Previous Sales) / Previous Sales) × 100 | Non-Additive |
+| `Promotion Revenue` | SUM(sales_amount) GROUP BY promotion_id | Additive |
+| `Supplier Revenue` | SUM(sales_amount) GROUP BY supplier_id | Additive |
+
+
+#### 2. Fact_Returns Measures
+
+| Measure | Description | Measure Type |
+|---|---|---|
+| `refund` | จำนวนเงินที่คืนให้ลูกค้า | Additive |
+
+Calculated Measures:
+
+| Calculated Measure | Formula | Measure Type |
+|---|---|---|
+| `Total Refund` | SUM(refund) | Additive |
+| `Return Rate` | Returned Transactions / Total Sales Transactions × 100 | Non-Additive |
+
+หมายเหตุ: เนื่องจากตาราง `Returns` ไม่มี `returned_quantity` จึงไม่สามารถคำนวณ Return Rate จากจำนวนชิ้นสินค้าได้โดยตรง หากต้องการคำนวณ Return Rate ตามจำนวนสินค้า จำเป็นต้องมีข้อมูลจำนวนสินค้าที่คืนเพิ่มเติม
+
+
+#### 3. Fact_Shipments Measures
+
+| Measure | Description | Measure Type |
+|---|---|---|
+| `shipment_count` | จำนวนรายการจัดส่ง | Additive |
+
+Calculated Measures:
+
+| Calculated Measure | Formula | Measure Type |
+|---|---|---|
+| `Shipment Count` | COUNT(shipment_id) | Additive |
+| `Shipment Status Rate` | Shipment Count by Status / Total Shipment Count × 100 | Non-Additive |
+
+หมายเหตุ: ตาราง `Shipments` มีเพียง `shipment_id`, `order_id` และ `status` จึงสามารถวิเคราะห์จำนวนและสัดส่วนตามสถานะได้ แต่ไม่สามารถคำนวณ Delivery Lead Time หรือ On-Time Delivery Rate ได้
+
+
+#### 4. Fact_Payments Measures
+
+| Measure | Description | Measure Type |
+|---|---|---|
+| `amount` | จำนวนเงินที่ชำระ | Additive |
+
+Calculated Measures:
+
+| Calculated Measure | Formula | Measure Type |
+|---|---|---|
+| `Total Payment Amount` | SUM(amount) | Additive |
+| `Payment Transaction Count` | COUNT(payment_id) | Additive |
+
+หมายเหตุ: ตาราง `Payments` ไม่มี `payment_method` จึงไม่สามารถวิเคราะห์ Payment Method Usage ตามประเภทวิธีการชำระเงินได้
 
 ---
+
+### 4.5 Summary of Fact and Dimension Tables
 
 ### 3.4 Summary of Fact and Dimension Tables
 
-| Table | Type | Grain / Purpose |
-|---|---|---|
-| `Fact_Sales` | Fact | 1 Order Line Item |
-| `Fact_Returns` | Fact | 1 Return Transaction |
-| `Fact_Shipments` | Fact | 1 Shipment |
-| `Fact_Payments` | Fact | 1 Payment Transaction |
-| `Dim_Date` | Dimension | วิเคราะห์ตามช่วงเวลา |
-| `Dim_Product` | Dimension | วิเคราะห์สินค้าและหมวดหมู่ |
-| `Dim_Customer` | Dimension | วิเคราะห์ลูกค้า |
-| `Dim_Store` | Dimension | วิเคราะห์สาขา |
-| `Dim_Promotion` | Dimension | วิเคราะห์โปรโมชั่น |
-| `Dim_Supplier` | Dimension | วิเคราะห์ Supplier |
-| `Dim_Employee` | Dimension | วิเคราะห์ข้อมูลพนักงาน |
+#### Fact Tables
+
+| Table | Grain / Purpose | Base Measures | Measure Type | Calculated Measures |
+|---|---|---|---|---|
+| `Fact_Sales` | 1 Order Line Item | `quantity`, `sales_amount`, `discount`, `unit_price` | Additive: `quantity`, `sales_amount`, `discount` / Non-Additive: `unit_price` | `Average Selling Price`, `AOV`, `Sales Growth Rate`, `Promotion Revenue`, `Supplier Revenue` |
+| `Fact_Returns` | 1 Return Transaction | `refund` | Additive | `Total Refund`, `Return Rate*` |
+| `Fact_Shipments` | 1 Shipment | `shipment_count` | Additive | `Shipment Status Rate` |
+| `Fact_Payments` | 1 Payment Transaction | `amount` | Additive | `Total Payment Amount`, `Payment Transaction Count` |
+
+
+#### Dimension Tables
+
+| Table | Type | Primary Key | Main Attributes | Purpose |
+|---|---|---|---|---|
+| `Dim_Date` | Dimension | `date_id` | `day`, `month`, `quarter`, `year` | วิเคราะห์ข้อมูลตามช่วงเวลา |
+| `Dim_Product` | Dimension | `product_id` | `category_id`, `category_name`, `supplier_id`, `price` | วิเคราะห์สินค้าและหมวดหมู่ |
+| `Dim_Customer` | Dimension | `customer_id` | `city`, `signup_date` | วิเคราะห์ลูกค้าและพฤติกรรมการซื้อ |
+| `Dim_Store` | Dimension | `store_id` | `city` | วิเคราะห์ยอดขายตามสาขา |
+| `Dim_Promotion` | Dimension | `promotion_id` | `discount` | วิเคราะห์ประสิทธิภาพของ Promotion |
+| `Dim_Supplier` | Dimension | `supplier_id` | `country` | วิเคราะห์ Supplier และรายได้จากสินค้า |
+| `Dim_Employee` | Dimension | `employee_id` | `store_id`, `salary` | วิเคราะห์ข้อมูลพนักงานและสาขา |
+
+> **Note:** `Return Rate` สามารถคำนวณได้ตามข้อมูลที่มีอยู่ในระบบ แต่หากต้องการคำนวณในรูปแบบ `Returned Quantity / Sold Quantity × 100` จำเป็นต้องมีข้อมูลจำนวนสินค้าที่คืน (`returned_quantity`) ซึ่งไม่มีอยู่ใน ER ปัจจุบัน
 
 ---
 
-### 3.5 Overall Multidimensional Model
+### 4.6 Overall Multidimensional Model
 
 Multidimensional Data Model ของระบบประกอบด้วยหลาย Fact Tables ที่ใช้ Dimension ร่วมกัน โดย `Fact_Sales` เป็น Fact หลักสำหรับการวิเคราะห์ยอดขาย และมี `Fact_Returns`, `Fact_Shipments` และ `Fact_Payments` สำหรับรองรับกระบวนการคืนสินค้า การจัดส่ง และการชำระเงินตามลำดับ
 
