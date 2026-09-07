@@ -187,7 +187,7 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 ## 3.Business Questions (ฟีฟ่า)
 
 
-## ## 4. Business Process and Multidimensional Data Model
+## 4. Business Process and Multidimensional Data Model
 
 ### 4.1 Business Process
 
