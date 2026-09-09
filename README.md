@@ -168,6 +168,7 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 
 ## 2. ER Diagram (หลิน) 
 <img src="./readme_images/Miniproject Diagram.drawio (1).png">
+
 ## Database Relationships
 
 | Table | Relationship | Table |
@@ -1458,6 +1459,7 @@ CSV Source → Extract → DuckDB Staging → Cleaning & Validation → Transfor
 https://dadamini-project-aj-perm-manifest-get-a.streamlit.app/
 # Infographic
 <img src="./readme_images/infographic.png">
+
 # Source
 Datarspectrum Technology Training Center. (n.d.). Retail Data Warehouse – 12 Table 1M+ Rows Dataset [Data set]. Kaggle.
 https://www.kaggle.com/datasets/datarspectrum/retail-data-warehouse-12-table-1m-rows-dataset
