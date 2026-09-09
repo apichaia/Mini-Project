@@ -301,7 +301,7 @@ Dataset ที่ใช้ในโครงงานเป็นข้อมู
 | 12 | shipments | 300,000 | 3 | Transaction |
 
 รวมข้อมูลทั้งหมด
-<1,631,380 Records และ 39 Columns>
+<1,591,380 Records และ 39 Columns>
 
 
 # Retail Data Warehouse — End-to-End ELT Pipeline with DuckDB
