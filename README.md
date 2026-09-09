@@ -651,12 +651,8 @@ DATA ANALYSIS
 
 
 ```
-
-<img width="1125" height="1456" alt="it5" src="https://github.com/user-attachments/assets/7a5aca64-7378-412e-bf90-439a58451b6a" />
-<img width="1125" height="1456" alt="lt4" src="https://github.com/user-attachments/assets/1276d3e2-38bf-4f89-8260-43afc5a503ea" />
-<img width="1125" height="1456" alt="lt3" src="https://github.com/user-attachments/assets/58e66a30-0e61-4a10-9b6b-84d7d885ed25" />
-<img width="1125" height="1456" alt="lt2" src="https://github.com/user-attachments/assets/63833c61-b31f-40c4-b99f-eca40e4b8025" />
 <img width="1125" height="1456" alt="lt1" src="https://github.com/user-attachments/assets/98fcc67a-ee45-4ef6-9fdf-2f925b137268" />
-
-
-
+<img width="1125" height="1456" alt="lt2" src="https://github.com/user-attachments/assets/63833c61-b31f-40c4-b99f-eca40e4b8025" />
+<img width="1125" height="1456" alt="lt3" src="https://github.com/user-attachments/assets/58e66a30-0e61-4a10-9b6b-84d7d885ed25" />
+<img width="1125" height="1456" alt="lt4" src="https://github.com/user-attachments/assets/1276d3e2-38bf-4f89-8260-43afc5a503ea" />
+<img width="1125" height="1456" alt="it5" src="https://github.com/user-attachments/assets/7a5aca64-7378-412e-bf90-439a58451b6a" />
