@@ -185,8 +185,9 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 | stores | 1:N | employees |
 
 ## 3.Business Questions (ฟีฟ่า)
-
-
+<img src="./readme_images/Business Q1.jpg">
+<img src="./readme_images/KPI1.jpg">
+<img src="./readme_images/KPI2.jpg">
 ## 4. Business Process and Multidimensional Data Model
 
 ### 4.1 Business Process
@@ -1455,7 +1456,7 @@ CSV Source → Extract → DuckDB Staging → Cleaning & Validation → Transfor
 ## Dashboard Link
 https://dadamini-project-aj-perm-manifest-get-a.streamlit.app/
 # Infographic
-
+<img src="./readme_images/infographic.png">
 # Source
 Datarspectrum Technology Training Center. (n.d.). Retail Data Warehouse – 12 Table 1M+ Rows Dataset [Data set]. Kaggle.
 https://www.kaggle.com/datasets/datarspectrum/retail-data-warehouse-12-table-1m-rows-dataset
