@@ -304,7 +304,7 @@ Dataset ที่ใช้ในโครงงานเป็นข้อมู
 <1,631,380 Records และ 39 Columns>
 
 
-# ๒Retail Data Warehouse — End-to-End ELT Pipeline with DuckDB
+# Retail Data Warehouse — End-to-End ELT Pipeline with DuckDB
 
 > **Project Documentation | Extract → Load → Transform Architecture**  
 > *เอกสารสรุปการพัฒนาระบบ คลังข้อมูลสินค้าปลีก ด้วย Python, Pandas และ DuckDB*
