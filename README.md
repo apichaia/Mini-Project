@@ -258,309 +258,256 @@ Measure
 
 ## การดำเนินงานด้านการจัดการข้อมูลด้วยกระบวนการ ELT
 
-1. การจัดการข้อมูลด้วยกระบวนการ ELT คือ
+1. กระบวนการ ELT (ELT Process)
+## 1.1 หลักการและแนวคิดของ ELT
 
-การจัดการข้อมูลของโครงงานนี้ประยุกต์ใช้แนวคิด ELT (Extract, Load, Transform) ซึ่งเป็นกระบวนการจัดการข้อมูลที่ประกอบด้วย 3 ขั้นตอน ได้แก่ การดึงข้อมูลจากแหล่งข้อมูลต้นทาง (Extract) การนำข้อมูลเข้าสู่ระบบฐานข้อมูลปลายทาง (Load) และการแปลงหรือปรับปรุงข้อมูลภายหลังจากที่ข้อมูลถูกโหลดเข้าสู่ระบบแล้ว (Transform)
+โครงงานนี้ใช้กระบวนการ ELT (Extract, Load, Transform) ในการจัดการข้อมูล โดยมีวัตถุประสงค์เพื่อรวบรวมข้อมูลจากระบบต้นทาง จัดเก็บข้อมูลในฐานข้อมูล และดำเนินการทำความสะอาดและแปลงข้อมูลภายหลังจากที่ข้อมูลถูก Load เข้าสู่ฐานข้อมูลแล้ว
 
-แนวทาง ELT แตกต่างจากกระบวนการ ETL (Extract, Transform, Load) ในลำดับการประมวลผลข้อมูล โดย ETL จะทำการแปลงข้อมูลก่อนนำเข้าสู่ฐานข้อมูล ในขณะที่ ELT จะนำข้อมูลเข้าสู่ระบบปลายทางก่อน แล้วจึงดำเนินการตรวจสอบ ทำความสะอาด และแปลงข้อมูลภายในระบบปลายทาง วิธีการดังกล่าวช่วยให้สามารถเก็บข้อมูลต้นฉบับไว้เป็น Raw Data และสามารถย้อนกลับมาตรวจสอบหรือประมวลผลข้อมูลใหม่ได้ในภายหลัง
+ELT ประกอบด้วย 3 ขั้นตอนหลัก ได้แก่
 
-สำหรับโครงงานนี้ใช้ Google Colab เป็นสภาพแวดล้อมในการดำเนินงานร่วมกับ Python และ Pandas เพื่อดึงข้อมูลจาก Google Drive ตรวจสอบข้อมูล และเตรียมข้อมูลสำหรับนำเข้าสู่ระบบฐานข้อมูลปลายทาง
+Extract – การดึงข้อมูลจากแหล่งข้อมูลต้นทาง
+Load – การนำข้อมูลเข้าสู่ฐานข้อมูลในรูปแบบ Raw/Staging
+Transform – การทำความสะอาด แปลง และจัดโครงสร้างข้อมูลเพื่อเตรียมเข้าสู่ Data Warehouse
 
-2. ขั้นตอน Extract
+| ขั้นตอน (Stage) | ชื่อชั้นข้อมูล (Layer Name) | เครื่องมือ / เทคโนโลยี (Tools) | หน้าที่และการทำงาน (Function / Tasks) |
+| :--- | :--- | :--- | :--- |
+| **1. Source** | **แหล่งข้อมูลต้นทาง** | Google Drive / CSV Files | จัดเก็บไฟล์ข้อมูลดิบรูปแบบ CSV บน Google Drive พร้อมสำหรับการดึงไปใช้งาน |
+| **2. Extract** | **Raw / Staging** | DuckDB | ทำการดึงข้อมูลดิบ (Extract) เข้าสู่พื้นที่พักข้อมูล (Staging Area) เพื่อเตรียมนำไปแปลงสภาพ |
+| **3. Transform** | **Transform Layer** | Data Processing Engine | ทำการทำความสะอาดข้อมูล (Cleaning), เชื่อมโยงข้อมูล (Join), แปลงชนิดข้อมูล (Type Conversion) และคำนวณค่าต่างๆ (Calculation) |
+| **4. Storage** | **Data Warehouse** | Relational / Analytical DB | จัดเก็บข้อมูลที่ผ่านการแปลงแล้วลงในรูปแบบ **Fact Tables** (ตารางข้อเท็จจริง) และ **Dimension Tables** (ตารางมิติ) |
+| **5. Output** | **Analysis** | BI Tools / Dashboards / SQL | นำข้อมูลที่จัดเก็บใน Data Warehouse ไปวิเคราะห์ ทำรายงาน หรือนำเสนอต่อผู้ใช้งาน |
 
-2.1 แหล่งข้อมูล
+## 1.2 โครงสร้าง Dataset
 
-ข้อมูลที่ใช้ในการดำเนินโครงงานเป็น Dataset เกี่ยวกับธุรกิจค้าปลีก โดยจัดเก็บอยู่ใน Google Drive และประกอบด้วยข้อมูลที่เกี่ยวข้องกับการดำเนินงานของธุรกิจ เช่น ข้อมูลลูกค้า สินค้า ร้านค้า พนักงาน ผู้จัดจำหน่าย โปรโมชั่น คำสั่งซื้อ รายการสินค้าในการสั่งซื้อ การชำระเงิน การจัดส่ง และการคืนสินค้า
+Dataset ที่ใช้ในโครงงานเป็นข้อมูลระบบค้าปลีก ประกอบด้วยข้อมูลเกี่ยวกับลูกค้า สินค้า ร้านค้า คำสั่งซื้อ การชำระเงิน การจัดส่ง การคืนสินค้า โปรโมชั่น และข้อมูลที่เกี่ยวข้องกับการดำเนินงานของธุรกิจค้าปลีก
 
-ในการดำเนินงาน ได้เชื่อมต่อ Google Drive เข้ากับ Google Colab เพื่อให้สามารถเข้าถึงไฟล์ Dataset ได้ จากนั้นตรวจสอบรายการไฟล์และประเภทของข้อมูลก่อนนำเข้าสู่กระบวนการประมวลผล
-
-2.2 การนำข้อมูลเข้าสู่ Google Colab
-
-หลังจากเชื่อมต่อ Google Drive แล้ว ได้ใช้ Python และ Pandas ในการอ่านข้อมูลจากไฟล์ CSV และจัดเก็บข้อมูลแต่ละตารางในรูปแบบ DataFrame เพื่อใช้ในการตรวจสอบและจัดการข้อมูล
-
-จากการตรวจสอบพบ Dataset หลักจำนวน 12 ตาราง ได้แก่
-
-employees
-returns
-products
-suppliers
-categories
-promotions
-stores
-customers
-payments
-orders
-order_items
-shipments
-
+จากการตรวจสอบข้อมูลพบ 12 ตารางหลัก ดังนี้
 นอกจากนี้ยังพบไฟล์ข้อมูลประเภท TXT และ ZIP ซึ่งเป็นข้อมูลตัวอย่างขนาดเล็ก จึงแยกออกจาก Dataset หลักเพื่อให้การวิเคราะห์โครงสร้างฐานข้อมูลค้าปลีกมีความชัดเจน
 
-2.3 ผลการ Extract ข้อมูล
+| ลำดับ | ตาราง | Records | Columns | ประเภทข้อมูล |
+| :---: | :--- | :---: | :---: | :---: |
+| 1 | employees | 1,000 | 3 | Master |
+| 2 | returns | 30,000 | 3 | Transaction |
+| 3 | products | 10,000 | 4 | Master |
+| 4 | suppliers | 200 | 2 | Master |
+| 5 | categories | 30 | 2 | Master |
+| 6 | promotions | 50 | 2 | Master |
+| 7 | stores | 100 | 2 | Master |
+| 8 | customers | 50,000 | 3 | Master |
+| 9 | payments | 300,000 | 3 | Transaction |
+| 10 | orders | 300,000 | 5 | Transaction |
+| 11 | order_items | 600,000 | 5 | Transaction |
+| 12 | shipments | 300,000 | 3 | Transaction |
 
-จากการตรวจสอบจำนวน Records และ Columns ของ Dataset หลัก พบรายละเอียดดังตาราง
+รวมข้อมูลทั้งหมด
+<1,631,380 Records และ 39 Columns>
 
-## รายละเอียดตารางข้อมูล
+## 1.3 การเตรียมสภาพแวดล้อมสำหรับ ELT
 
-| ลำดับ | ตาราง | จำนวน Records | จำนวน Columns | รายละเอียด |
-|:---:|---|---:|---:|---|
-| 1 | `employees` | 1,000 | 3 | ข้อมูลพนักงาน |
-| 2 | `returns` | 30,000 | 3 | ข้อมูลการคืนสินค้า |
-| 3 | `products` | 10,000 | 4 | ข้อมูลสินค้า |
-| 4 | `suppliers` | 200 | 2 | ข้อมูลผู้จัดจำหน่าย |
-| 5 | `categories` | 30 | 2 | ข้อมูลประเภทสินค้า |
-| 6 | `promotions` | 50 | 2 | ข้อมูลโปรโมชั่น |
-| 7 | `stores` | 100 | 2 | ข้อมูลสาขา |
-| 8 | `customers` | 50,000 | 3 | ข้อมูลลูกค้า |
-| 9 | `payments` | 300,000 | 3 | ข้อมูลการชำระเงิน |
-| 10 | `orders` | 300,000 | 5 | ข้อมูลคำสั่งซื้อ |
-| 11 | `order_items` | 600,000 | 5 | รายละเอียดสินค้าในคำสั่งซื้อ |
-| 12 | `shipments` | 300,000 | 3 | ข้อมูลการจัดส่ง |
+การดำเนินงานใช้ Google Colab เป็นสภาพแวดล้อมสำหรับเขียนและประมวลผล Python โดยข้อมูลต้นทางถูกจัดเก็บอยู่ใน Google Drive
 
-จากตารางข้างต้นพบว่า Dataset หลักมีข้อมูลทั้งหมด 1,631,380 Records และ 39 Columns โดยตาราง order_items มีจำนวน Records มากที่สุด คือ 600,000 Records รองลงมาคือ orders, payments และ shipments ซึ่งมีตารางละ 300,000 Records สะท้อนให้เห็นว่า Dataset มีข้อมูลธุรกรรมจำนวนมากและมีโครงสร้างที่สอดคล้องกับระบบธุรกิจค้าปลีก
+เครื่องมือที่ใช้ ได้แก่  Google Drive ,Google Colab,Python ,Pandas, DuckDB ,SQL
 
-3. ขั้นตอน Load
 
-หลังจากดำเนินการ Extract ข้อมูลจาก Google Drive แล้ว ข้อมูลถูกนำเข้าสู่ระบบฐานข้อมูลปลายทางเพื่อจัดเก็บข้อมูลก่อนเข้าสู่กระบวนการ Transform ซึ่งเป็นลักษณะสำคัญของกระบวนการ ELT
+1.3.1 ติดตั้ง Library
+!pip install duckdb -q
 
-ข้อมูลที่นำเข้าสู่ระบบประกอบด้วยตารางหลัก ได้แก่ customers, products, orders, order_items, payments, shipments, returns รวมถึงตารางข้อมูลสนับสนุน ได้แก่ employees, suppliers, categories, stores และ promotions
+import pandas as pd
+import duckdb
+import os
 
-การ Load ข้อมูลในขั้นตอนนี้มีวัตถุประสงค์เพื่อรักษาข้อมูลจากแหล่งต้นทางให้ครบถ้วนก่อนดำเนินการแปลงข้อมูล โดยสามารถเก็บข้อมูลในลักษณะ Raw Data เพื่อใช้เป็นข้อมูลต้นฉบับสำหรับตรวจสอบย้อนกลับได้
+1.3.2 เชื่อมต่อ Google Drive
+from google.colab import drive
 
-3.1 การตรวจสอบข้อมูลหลัง Load
+drive.mount('/content/drive')
 
-หลังจากนำข้อมูลเข้าสู่ระบบปลายทาง ได้ทำการตรวจสอบจำนวน Records ของแต่ละตารางอีกครั้ง เพื่อเปรียบเทียบกับจำนวน Records จากแหล่งข้อมูลต้นทาง
+1.3.3 กำหนด Path ของ Dataset
+path = '/content/drive/My Drive/miniproject_สินค้าปลีก'
 
-ผลการตรวจสอบมีวัตถุประสงค์เพื่อยืนยันว่า การนำข้อมูลเข้าสู่ระบบปลายทางไม่ได้ทำให้ข้อมูลสูญหายหรือจำนวน Records เปลี่ยนแปลงโดยไม่มีเหตุผล
+print("Dataset Path:")
+print(path)
 
-หากจำนวน Records ก่อนและหลัง Load มีค่าเท่ากัน สามารถยืนยันได้ในระดับหนึ่งว่าข้อมูลถูกนำเข้าสู่ระบบอย่างครบถ้วน
+print("\nFiles:")
+print(os.listdir(path))
 
-4. ขั้นตอน Transform
+1.4 Extract
+1.4.1 ความหมายของ Extract
 
-หลังจากข้อมูลถูก Load เข้าสู่ระบบปลายทางแล้ว จึงดำเนินการ Transform โดยมีวัตถุประสงค์เพื่อ ตรวจสอบคุณภาพข้อมูล ทำความสะอาดข้อมูล ปรับรูปแบบข้อมูล และเตรียมข้อมูลให้เหมาะสมกับการวิเคราะห์
+Extract คือขั้นตอนการดึงข้อมูลจากระบบต้นทางเข้าสู่กระบวนการประมวลผล
 
-การ Transform ของโครงงานประกอบด้วยการดำเนินงานดังต่อไปนี้
+ในโครงงานนี้ แหล่งข้อมูลต้นทางคือไฟล์ CSV ที่อยู่ใน Google Drive โดยมีทั้งหมด 12 ตารางหลัก ได้แก่
 
-4.1 การตรวจสอบโครงสร้างข้อมูล
+| ลำดับ | ชื่อไฟล์ (File Name) |
+| :---: | :--- |
+| 1 | employees.csv |
+| 2 | returns.csv |
+| 3 | products.csv |
+| 4 | suppliers.csv |
+| 5 | categories.csv |
+| 6 | promotions.csv |
+| 7 | stores.csv |
+| 8 | customers.csv |
+| 9 | payments.csv |
+| 10 | orders.csv |
+| 11 | order_items.csv |
+| 12 | shipments.csv |
 
-ทำการตรวจสอบชื่อ Column จำนวน Column และ Data Type ของแต่ละตาราง เพื่อให้แน่ใจว่าข้อมูลมีโครงสร้างเหมาะสมกับลักษณะของข้อมูล
+1.4.2 กำหนดรายชื่อตาราง
+tables = [
+    'employees',
+    'returns',
+    'products',
+    'suppliers',
+    'categories',
+    'promotions',
+    'stores',
+    'customers',
+    'payments',
+    'orders',
+    'order_items',
+    'shipments'
+]
 
-ตัวอย่างเช่น `ตาราง order `ประกอบด้วย
-| ตาราง | รายละเอียด | 
-|:---:|---|
-|`order_id`| เป็นรหัสคำสั่งซื้อ|
-|`store_id`| เป็นรหัสร้านค้า|
-|`order_date`| เป็นวันที่สั่งซื้อ|
-|`promotion_id` |เป็นรหัสโปรโมชั่น|
+print("จำนวนตารางทั้งหมด:", len(tables))
 
-ส่วนตาราง order_items ประกอบด้วย
-| ตาราง | 
-|:---:|
-|`order_item_id`|
-|`order_id`|
-|`product_id`|
-|`qty`|
-|`price`|
+1.4.3 อ่านข้อมูล CSV
 
-ข้อมูลประเภท ID และจำนวนสินค้าเป็นข้อมูลเชิงตัวเลข ขณะที่ข้อมูลประเภทชื่อ เมือง หรือสถานะเป็นข้อมูลข้อความ
+loaded_data = {}
 
-5. การตรวจสอบ Missing Value
+for table in tables:
+    file_path = os.path.join(path, table + '.csv')
+    df = pd.read_csv(file_path)
+    loaded_data[table] = df
+    print(f"{table}.csv -> {len(df):,} records")
 
-ดำเนินการตรวจสอบ Missing Value ของทุก Column ในแต่ละตาราง เพื่อค้นหาข้อมูลที่ไม่มีค่า ซึ่งอาจส่งผลกระทบต่อการวิเคราะห์ในขั้นตอนต่อไป
 
-จากผลการตรวจสอบ Dataset หลัก พบว่า ไม่พบ Missing Value ใน Column ของตารางหลักทั้ง 12 ตาราง
+1.4.4 ตรวจสอบผลการ Extract
 
-ดังนั้นจึงไม่มีความจำเป็นต้องดำเนินการเติมค่าที่หายไป เช่น ค่าเฉลี่ย ค่ามัธยฐาน หรือค่าที่กำหนดขึ้นเอง และไม่จำเป็นต้องลบ Records เนื่องจากไม่พบข้อมูลสูญหายในขั้นตอนการตรวจสอบเบื้องต้น
+for table in tables:
+    df = loaded_data[table]
+    print(
+        f"{table:15} | "
+        f"Rows = {len(df):,} | "
+        f"Columns = {len(df.columns)}"
+    )
 
-6. การตรวจสอบ Duplicate Records
+## 1.5 Load
+1.5.1 ความหมายของ Load
 
-ดำเนินการตรวจสอบข้อมูลซ้ำในแต่ละตาราง โดยพิจารณาการซ้ำของข้อมูลในระดับทั้ง Records
+หลังจาก Extract ข้อมูลจาก CSV แล้ว ขั้นตอนต่อไปคือ Load
 
-ผลการตรวจสอบพบว่า ไม่พบ Duplicate Records ในตารางหลัก
+ในโครงงานนี้ข้อมูลจะถูกนำเข้าสู่ DuckDB โดยจัดเก็บในรูปแบบ Staging Tables
 
-ผลดังกล่าวแสดงให้เห็นว่าไม่พบ Records ที่มีข้อมูลทุก Column เหมือนกันจากการตรวจสอบเบื้องต้น ซึ่งช่วยลดความเสี่ยงในการนับข้อมูลซ้ำเมื่อข้อมูลถูกนำไปใช้ในการวิเคราะห์
+1.5.2 สร้าง DuckDB
 
-อย่างไรก็ตาม การตรวจสอบ Duplicate Records ในระดับทั้งแถวแตกต่างจากการตรวจสอบค่าซ้ำของ Primary Key ดังนั้นจึงควรตรวจสอบ Primary Key แยกต่างหากเพื่อยืนยันความถูกต้องของโครงสร้างฐานข้อมูล
+db_path = os.path.join(path, 'retail.duckdb')
+con = duckdb.connect(db_path)
 
-7. การตรวจสอบ Primary Key
+print("เชื่อมต่อ DuckDB สำเร็จ")
+print("Database:", db_path)
 
-ดำเนินการตรวจสอบ Column ที่ทำหน้าที่เป็นรหัสประจำ Records ของแต่ละตาราง เช่น
+1.5.3 Load CSV → Staging Tables
 
-| ตาราง | Primary Key |
-|:---:|---|
-| `employees` | `employee_id` |
-| `returns` | `return_id` |
-| `products` | `product_id` |
-| `suppliers` | `supplier_id` |
-| `categories` | `category_id` |
-| `promotions` | `promotion_id` |
-| `stores` | `store_id` |
-| `customers` | `customer_id` |
-| `payments` | `payment_id` |
-| `orders` | `order_id` |
-| `order_items` | `order_item_id` |
-| `shipments` | `shipment_id` |
+for table in tables:
+    file_path = os.path.join(path, table + '.csv')
 
-การตรวจสอบ Primary Key มีวัตถุประสงค์เพื่อค้นหาค่าที่ซ้ำกัน เนื่องจาก Primary Key ควรสามารถระบุ Records แต่ละรายการได้อย่างเป็นเอกลักษณ์
+    con.execute(f"""
+        CREATE OR REPLACE TABLE stg_{table} AS
+        SELECT *
+        FROM read_csv_auto(?)
+    """, [file_path])
 
-8. การตรวจสอบความสัมพันธ์ระหว่างตาราง
+    print(f"Loaded: {table}.csv -> stg_{table}")
 
-เนื่องจาก Dataset มีลักษณะเป็นข้อมูลหลายตาราง จึงต้องตรวจสอบความสัมพันธ์ระหว่างตารางด้วย โดยใช้รหัสที่เชื่อมโยงระหว่างตาราง เช่น
+	1.5.4 ทำไมต้องใช้ Staging Layer?
 
-## 8. ความสัมพันธ์ระหว่างตาราง
+Staging Layer มีหน้าที่เป็นพื้นที่พักข้อมูลก่อน Transform
+### ข้อดีของการใช้ Raw / Staging Layer (DuckDB)
 
-### 8.1 Customers และ Orders
+| ลำดับ | รายการข้อดี | รายละเอียดการทำงาน |
+| :---: | :--- | :--- |
+| 1 | **Data Persistence** | เก็บข้อมูลจาก Source ไว้ใน Database โดยตรง |
+| 2 | **Performance Optimization** | ลดการอ่านไฟล์ CSV ซ้ำหลายครั้ง ช่วยประหยัดเวลาการทำงาน |
+| 3 | **Data Validation** | ตรวจสอบข้อมูลเบื้องต้นก่อนเข้าสู่กระบวนการ Transform |
+| 4 | **Record Counting** | สามารถตรวจสอบจำนวน Records ทั้งหมดได้อย่างแม่นยำ |
+| 5 | **Data Type Inspection** | ตรวจสอบชนิดของข้อมูล (Data Type) ในแต่ละคอลัมน์ได้ |
+| 6 | **Missing Value Check** | ตรวจสอบข้อมูลสูญหายหรือค่าว่าง (Null / Missing Value) |
+| 7 | **Duplicate Identification** | ตรวจสอบและค้นหาข้อมูลที่ซ้ำซ้อน (Duplicate Data) |
+| 8 | **Architecture Separation** | แยกข้อมูลดิบต้นทาง (Source) ออกจากข้อมูลที่แปลงแล้ว (Transformed Data) อย่างเป็นระบบ |
 
-| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
-|:---|:---:|:---|:---:|:---|
-| `customers` | `customer_id` | `orders` | `customer_id` | `customer_id` ในตาราง `orders` ใช้เชื่อมโยงไปยัง `customer_id` ในตาราง `customers` |
+1.5.5 ตรวจสอบว่า Load สำเร็จหรือไม่
 
-**ความสัมพันธ์**
+tables_in_db = con.execute("""
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'main'
+    ORDER BY table_name
+""").df()
 
-`customers.customer_id`  
-↓  
-`orders.customer_id`
+display(tables_in_db)
+
+1.5.6 ตรวจสอบจำนวน Records หลัง Load
+
+load_result = []
+
+for table in tables:
+    count = con.execute(
+        f"SELECT COUNT(*) FROM stg_{table}"
+    ).fetchone()[0]
+
+    load_result.append({
+        'Source File': table + '.csv',
+        'Staging Table': 'stg_' + table,
+        'Records': count
+    })
+
+load_summary = pd.DataFrame(load_result)
+
+display(load_summary)
+
+1.5.7 ตรวจสอบจำนวน Records รวม
+
+total_records = load_summary['Records'].sum()
+
+print(f"จำนวนตารางทั้งหมด : {len(load_summary)} ตาราง")
+print(f"จำนวน Records รวม : {total_records:,} Records")
+
+
+## 1.6 Transform
+
+หลังจากข้อมูลถูก Load เข้าสู่ Staging Layer แล้ว จะเข้าสู่ขั้นตอน Transform
+
+Transform เป็นส่วนสำคัญของ ELT เนื่องจากเป็นขั้นตอนที่ทำให้ข้อมูลพร้อมสำหรับ Data Warehouse และการวิเคราะห์
+
+กระบวนการ Transform ประกอบด้วย
+
+### 1.6 Transform Layer
+
+หลังจากข้อมูลถูก Load เข้าสู่ Staging Layer แล้ว จะเข้าสู่ขั้นตอน **Transform** ซึ่งเป็นส่วนสำคัญของสถาปัตยกรรม **ELT (Extract, Load, Transform)** เนื่องจากเป็นขั้นตอนการแปลงสภาพข้อมูลให้อยู่ในรูปแบบที่สมบูรณ์ ถูกต้อง และพร้อมสำหรับการนำไปจัดเก็บใน **Data Warehouse** เพื่อการวิเคราะห์ต่อไป
 
 ---
 
-### 8.2 Orders และ Order Items
+**กระบวนการ Transform ประกอบด้วย:**
 
-| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
-|:---|:---:|:---|:---:|:---|
-| `orders` | `order_id` | `order_items` | `order_id` | `order_id` ใช้เชื่อมโยงคำสั่งซื้อกับรายละเอียดสินค้าที่อยู่ภายในคำสั่งซื้อนั้น |
+| ลำดับ | กระบวนการ (Process) | รายละเอียดการทำงาน (Description) |
+| :---: | :--- | :--- |
+| **1** | **Data Cleaning** | การทำความสะอาดข้อมูล จัดการค่าที่หายไป (Null / Missing values), ลบข้อมูลซ้ำซ้อน (Duplicates) และแก้ไขค่าที่ไม่ถูกต้อง |
+| **2** | **Data Type Conversion** | การแปลงชนิดข้อมูลให้ถูกต้องและเหมาะสมกับการจัดเก็บ เช่น แปลง ข้อความ (String) เป็น วันที่ (Date/Timestamp) หรือ ตัวเลข (Numeric) |
+| **3** | **Data Transformation & Standardisation** | การปรับรูปแบบข้อมูลให้อยู่ในมาตรฐานเดียวกัน เช่น ตัดข้อความส่วนเกิน (Trim whitespace) หรือปรับรูปแบบตัวพิมพ์เล็ก-ใหญ่ (Upper/Lower case) |
+| **4** | **Calculations & Business Logic** | การคำนวณตัวเลขและสร้างคอลัมน์ใหม่ตามเงื่อนไขทางธุรกิจ เช่น ยอดขายรวม (Total Price), ส่วนลด (Discount) หรือกำไรขั้นต้น (Margin) |
+| **5** | **Data Joining & Structuring** | การเชื่อมโยงตารางข้อมูล (JOIN) และจัดกลุ่มโครงสร้างเพื่อเตรียมแปลงเป็น **Dim / Fact Tables** สำหรับ Data Warehouse |
 
-**ความสัมพันธ์**
+1.6.1 Data Cleaning
+ตรวจสอบ Missing Value
 
-`orders.order_id`  
-↓  
-`order_items.order_id`
+for table in tables:
+    df = con.execute(
+        f"SELECT * FROM stg_{table}"
+    ).df()
 
----
+    missing = df.isnull().sum()
 
-### 8.3 Products และ Order Items
+    print("=" * 60)
+    print(f"Missing Value: {table}")
+    print(missing)
 
-| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
-|:---|:---:|:---|:---:|:---|
-| `products` | `product_id` | `order_items` | `product_id` | `product_id` ใช้เชื่อมโยงข้อมูลสินค้าเข้ากับรายการสินค้าในการสั่งซื้อ |
-
-**ความสัมพันธ์**
-
-`products.product_id`  
-↓  
-`order_items.product_id`
-
----
-
-### 8.4 Products และ Categories
-
-| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
-|:---|:---:|:---|:---:|:---|
-| `categories` | `category_id` | `products` | `category_id` | `category_id` ใช้ระบุว่าสินค้าแต่ละรายการอยู่ในหมวดหมู่ใด |
-
-**ความสัมพันธ์**
-
-`categories.category_id`  
-↓  
-`products.category_id`
-
----
-
-### 8.5 Products และ Suppliers
-
-| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
-|:---|:---:|:---|:---:|:---|
-| `suppliers` | `supplier_id` | `products` | `supplier_id` | `supplier_id` ใช้ระบุว่าสินค้าได้รับการจัดหาจากผู้จัดจำหน่ายรายใด |
-
-**ความสัมพันธ์**
-
-`suppliers.supplier_id`  
-↓  
-`products.supplier_id`
-
-9. การ Transform ข้อมูลวันที่
-
-จากการตรวจสอบ Data Type พบว่า Column วันที่บางรายการถูกจัดเก็บในรูปแบบข้อความ เช่น
-
-`customers.signup_date`
-`orders.order_date`
-
-เพื่อให้เหมาะสมกับการวิเคราะห์ข้อมูลตามช่วงเวลา จึงสามารถ Transform ข้อมูลดังกล่าวให้อยู่ในรูปแบบวันที่ เช่น datetime
-
-การแปลงข้อมูลวันที่ช่วยให้สามารถวิเคราะห์ข้อมูลเพิ่มเติมได้ เช่น
-
-จำนวนลูกค้าที่สมัครในแต่ละเดือน,
-จำนวนคำสั่งซื้อรายวัน,
-จำนวนคำสั่งซื้อรายเดือน,
-แนวโน้มการสั่งซื้อในแต่ละช่วงเวลา,
-
-10. การคำนวณข้อมูลสำหรับการวิเคราะห์
-
-ในตาราง order_items มีข้อมูล qty และ price ซึ่งสามารถนำมาคำนวณมูลค่าการขายของแต่ละรายการได้ โดยกำหนดสูตรดังนี้
-
-`Sales Amount = Quantity × Price`
-
-หรือ
-
-`sales_amount = qty × price`
-
-การสร้าง Column ดังกล่าวถือเป็นการ Transform เนื่องจากเป็นการสร้างข้อมูลใหม่จากข้อมูลเดิมเพื่อเตรียมความพร้อมสำหรับการวิเคราะห์ยอดขาย
-
-11. การรวมข้อมูลหลายตาราง
-
-หลังจากตรวจสอบและทำความสะอาดข้อมูลแล้ว สามารถนำข้อมูลจากหลายตารางมาเชื่อมโยงกันเพื่อสร้างชุดข้อมูลสำหรับการวิเคราะห์
-
-ตัวอย่างเช่น การเชื่อมโยง
-
-`orders + order_items + products + categories`
-
-เพื่อให้สามารถวิเคราะห์ข้อมูลได้ในระดับคำสั่งซื้อ รายการสินค้า สินค้า และหมวดหมู่สินค้าในชุดข้อมูลเดียวกัน
-
-กระบวนการดังกล่าวช่วยลดความซับซ้อนในการวิเคราะห์ และทำให้สามารถนำข้อมูลไปสร้างรายงานหรือวิเคราะห์ยอดขายได้สะดวกยิ่งขึ้น
-
-12. ผลการตรวจสอบคุณภาพข้อมูล
-
-จากการดำเนินงาน ELT และตรวจสอบ Dataset ใน Google Colab สามารถสรุปผลการตรวจสอบเบื้องต้นได้ดังนี้
-
-## 13. สรุปการดำเนินงาน ELT
-
-การดำเนินงาน ELT (Extract, Load, Transform) ได้ดำเนินการเพื่อเตรียมข้อมูลจากฐานข้อมูลต้นทางให้มีความพร้อมสำหรับการวิเคราะห์และการจัดทำ Data Warehouse โดยเริ่มจากการ Extract ข้อมูลจากตารางต้นทางทั้งหมด 12 ตาราง จากนั้น Load ข้อมูลเข้าสู่ระบบฐานข้อมูล และดำเนินการ Transform ข้อมูลภายในระบบปลายทาง เพื่อให้ข้อมูลมีความถูกต้อง สอดคล้อง และพร้อมสำหรับการนำไปวิเคราะห์
-
-### รายการตรวจสอบข้อมูลหลังดำเนินการ ELT
-
-| รายการตรวจสอบ | ผลการตรวจสอบ |
-|:---|---|
-| จำนวนตารางหลัก | 12 ตาราง |
-| จำนวน Records รวม | 1,631,380 Records |
-| จำนวน Columns รวม | 39 Columns |
-| Missing Value | ไม่พบ |
-| Duplicate Records | ไม่พบ |
-| Data Type | ตรวจสอบแล้ว |
-| Primary Key | ตรวจสอบแยกตามตาราง |
-| ความสัมพันธ์ระหว่างตาราง | ตรวจสอบ Foreign Key |
-| ข้อมูลวันที่ | ตรวจสอบและเตรียมสำหรับ Transform |
-| ข้อมูลสำหรับวิเคราะห์ | สร้างจากการเชื่อมโยงหลายตาราง |
-
-
-จากการดำเนินงานสามารถสรุปกระบวนการ ELT ของโครงงานได้เป็น 3 ขั้นตอนหลัก ได้แก่ Extract, Load และ Transform
-
-ในขั้นตอน Extract ได้ทำการดึง Dataset จาก Google Drive เข้าสู่ Google Colab โดยใช้ Python และ Pandas จากนั้นตรวจสอบไฟล์และโครงสร้างข้อมูล พบ Dataset หลักจำนวน 12 ตาราง รวม 1,631,380 Records และ 39 Columns
-
-ในขั้นตอน Load ได้นำข้อมูลที่ดึงมาจากแหล่งต้นทางเข้าสู่ระบบฐานข้อมูลปลายทาง โดยรักษาข้อมูลต้นฉบับไว้ก่อนทำการเปลี่ยนแปลง เพื่อให้สามารถตรวจสอบและย้อนกลับไปยังข้อมูลต้นทางได้
-
-ในขั้นตอน Transform ได้ดำเนินการตรวจสอบและปรับปรุงข้อมูล ได้แก่ การตรวจสอบ Column และ Data Type การตรวจสอบ Missing Value การตรวจสอบ Duplicate Records การตรวจสอบ Primary Key การตรวจสอบความสัมพันธ์ระหว่างตาราง และการแปลงข้อมูลวันที่ให้เหมาะสมกับการวิเคราะห์ นอกจากนี้ยังสามารถสร้างข้อมูลใหม่ เช่น sales_amount จาก qty × price และเชื่อมโยงข้อมูลจากหลายตารางเพื่อสร้างชุดข้อมูลสำหรับการวิเคราะห์
-
-จากการตรวจสอบเบื้องต้นพบว่า Dataset หลัก ไม่พบ Missing Value และไม่พบ Duplicate Records ในระดับทั้งแถว ข้อมูลมีโครงสร้างหลายตารางที่สามารถเชื่อมโยงกันด้วย Key ต่าง ๆ เช่น` customer_id`, `order_id`, `product_id`, `category_id` และ` supplier_id` จึงมีความเหมาะสมสำหรับนำไปใช้ในขั้นตอนการวิเคราะห์ข้อมูลและการสร้างระบบรายงานต่อไป
-สรุปกระบวนการแบบสั้น
-                  
-## ELT Process
-
-| ขั้นตอน | กระบวนการ | รายละเอียด |
-|:---:|:---|:---|
-| **1** | 📂 **DATASET** | ข้อมูลต้นทาง (Dataset) |
-| ↓ | ↓ | ↓ |
-| **2** | 📥 **EXTRACT** | ดึงข้อมูลจาก **Google Drive → Google Colab** |
-| ↓ | ↓ | ↓ |
-| **3** | 💾 **LOAD** | โหลดข้อมูลเข้าสู่ **Target Database** และเก็บข้อมูลในรูปแบบ **Raw Data** |
-| ↓ | ↓ | ↓ |
-| **4** | ⚙️ **TRANSFORM** | ตรวจสอบและปรับปรุงข้อมูล ได้แก่ Data Type, Missing Value, Duplicate, Primary Key, Foreign Key, Join และ Calculate |
-| ↓ | ↓ | ↓ |
-| **5** | 📊 **OUTPUT** | ได้ข้อมูลที่ผ่านการตรวจสอบและ Transform พร้อมสำหรับการวิเคราะห์ |
