@@ -813,5 +813,6 @@ with tab2:
 st.markdown("---")
 
 st.caption(
+    
     "retail_data DW Explorer • DuckDB + Pandas + Streamlit"
 )
