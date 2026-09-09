@@ -353,7 +353,9 @@ Extract คือขั้นตอนการดึงข้อมูลจา
 | 12 | shipments.csv |
 
 1.4.2 กำหนดรายชื่อตาราง
-tables = [
+
+
+   tables = [
     'employees',
     'returns',
     'products',
@@ -367,6 +369,9 @@ tables = [
     'order_items',
     'shipments'
 ]
+
+print("จำนวนตารางทั้งหมด:", len(tables))
+print("จำนวนตารางทั้งหมด:", len(tables))
 
 print("จำนวนตารางทั้งหมด:", len(tables))
 
@@ -511,3 +516,237 @@ for table in tables:
     print(f"Missing Value: {table}")
     print(missing)
 
+
+## 1.1 หลักการและแนวคิดของ ELT
+
+โครงงานนี้ใช้กระบวนการ **ELT (Extract, Load, Transform)** ในการจัดการข้อมูล โดยมีวัตถุประสงค์เพื่อรวบรวมข้อมูลจากระบบต้นทาง จัดเก็บข้อมูลในฐานข้อมูล และดำเนินการทำความสะอาดและแปลงข้อมูลภายหลังจากที่ข้อมูลถูก Load เข้าสู่ฐานข้อมูลแล้ว
+
+1. **Extract:** การดึงข้อมูลจากแหล่งข้อมูลต้นทาง (Google Drive) 
+2. **Load:** การนำข้อมูลเข้าสู่ฐานข้อมูลในรูปแบบ Raw/Staging (`stg_*`) 
+3. **Transform:** การทำความสะอาด แปลง Data Type และจัดโครงสร้างข้อมูลเป็น Dimension / Fact Tables 
+
+┌─────────────────┐      Extract       ┌─────────────────┐│  Google Drive   │ ─────────────────► │  CSV Files (12) │└─────────────────┘                    └────────┬────────┘││ Load▼┌─────────────────┐      Transform     ┌─────────────────┐│ Data Warehouse  │ ◄───────────────── │  DuckDB Staging ││ (Dim / Fact)    │                    │   (stg_*)     │└────────┬────────┘                    └─────────────────┘│▼┌─────────────────┐│ Data Analysis / ││   BI Dashboards │└─────────────────┘
+---
+
+## 1.2 โครงสร้าง Dataset
+
+ Dataset ที่ใช้ในโครงงานเป็นข้อมูลระบบค้าปลีก ประกอบด้วยข้อมูล **12 ตารางหลัก** ดังนี้:
+
+| ลำดับ | ชื่อตาราง | จำนวน Records | จำนวน Columns | ประเภทตาราง |
+| :---: | :--- | ---: | ---: | :--- |
+| 1 | `employees` | 1,000 | 3 | Master Data |
+| 2 | `returns` | 30,000 | 3 | Transaction Data |
+| 3 | `products` | 10,000 | 4 | Master Data |
+| 4 | `suppliers` | 200 | 2 | Master Data |
+| 5 | `categories` | 30 | 2 | Master Data |
+| 6 | `promotions` | 50 | 2 | Master Data |
+| 7 | `stores` | 100 | 2 | Master Data |
+| 8 | `customers` | 50,000 | 3 | Master Data |
+| 9 | `payments` | 300,000 | 3 | Transaction Data |
+| 10 | `orders` | 300,000 | 5 | Transaction Data |
+| 11 | `order_items` | 600,000 | 5 | Transaction Data |
+| 12 | `shipments` | 300,000 | 3 | Transaction Data |
+| **รวม** | **12 ตาราง** | **1,591,380** | **39** | **Full Retail Dataset** |
+
+---
+
+## 1.3 การเตรียมสภาพแวดล้อม (Environment Setup)
+
+การดำเนินงานใช้ **Google Colab** ร่วมกับ **DuckDB** และ **Pandas**
+
+```python
+# 1.3.1 ติดตั้ง Library และ Import
+!pip install duckdb -q
+
+import pandas as pd
+import duckdb
+import os
+from google.colab import drive
+
+# 1.3.2 เชื่อมต่อ Google Drive
+drive.mount('/content/drive')
+
+# 1.3.3 กำหนด Path ของ Dataset
+path = '/content/drive/My Drive/miniproject_สินค้าปลีก'
+print("Dataset Path:", path)
+print("Files:", os.listdir(path))
+1.4 Extract Phaseกระบวนการดึงข้อมูลจากไฟล์ CSV ทั้ง 12 ตารางเข้ามาประมวลผลบน PythonPython# 1.4.2 กำหนดรายชื่อตาราง
+tables = [
+    'employees', 'returns', 'products', 'suppliers',
+    'categories', 'promotions', 'stores', 'customers',
+    'payments', 'orders', 'order_items', 'shipments'
+]
+
+# 1.4.3 อ่านข้อมูล CSV เข้า Pandas DataFrame
+loaded_data = {}
+for table in tables:
+    file_path = os.path.join(path, table + '.csv')
+    df = pd.read_csv(file_path)
+    loaded_data[table] = df
+    print(f"{table}.csv -> {len(df):,} records")
+1.5 Load Phase (Staging Layer)นำข้อมูลจาก Pandas/CSV เข้าสู่ DuckDB โดยสร้างเป็น Staging Tables (stg_*) เพื่อทำ Persistence ข้อมูลก่อน TransformPython# 1.5.2 สร้างการเชื่อมต่อ DuckDB
+db_path = os.path.join(path, 'retail.duckdb')
+con = duckdb.connect(db_path)
+
+# 1.5.3 Load CSV -> Staging Tables
+for table in tables:
+    file_path = os.path.join(path, table + '.csv')
+    con.execute(f"""
+        CREATE OR REPLACE TABLE stg_{table} AS
+        SELECT * FROM read_csv_auto(?)
+    """, [file_path])
+    print(f"Loaded: {table}.csv -> stg_{table}")
+ข้อดีของการใช้ Staging LayerData Persistence: เก็บข้อมูลจาก Source ไว้ใน Database โดยตรงPerformance: ลดการอ่านไฟล์ CSV ซ้ำหลายครั้งValidation: ตรวจสอบความถูกต้อง (Missing Values, Duplicates, Data Type) ก่อนนำไป TransformArchitecture Separation: แยก Source Data ออกจาก Transformation Logic อย่างชัดเจน1.6 Transform Phase & Data Cleaningทำการตรวจสอบคุณภาพข้อมูล และปรับแต่งให้พร้อมใช้งานสำหรับ Data Warehouse1.6.1 Data Quality Check ScriptsPython# ตรวจสอบ Missing Values และ Duplicates
+for table in tables:
+    df = con.execute(f"SELECT * FROM stg_{table}").df()
+    print("=" * 50)
+    print(f"Table: {table}")
+    print("Missing Values:\n", df.isnull().sum())
+    print("Duplicate Records:", df.duplicated().sum())
+1.6.2 Data Cleaning & Transformation Rulesกฎการจัดการ (Rule)รายละเอียดการทำงานMissing Valueตรวจสอบค่าว่างทุกคอลัมน์ (พบ 0 Missing Values)Duplicatesตรวจสอบและกำจัดแถวที่ซ้ำซ้อน (พบ 0 Duplicate Rows)Primary Key Validationตรวจสอบความซ้ำซ้อนของ PK (COUNT > 1 = 0)Foreign Key Validationตรวจสอบ Referential Integrity ระหว่างตารางDate Conversionแปลง Text/String Date เป็น DATE Type ผ่าน TRY_CAST()Measure Calculationคำนวณยอดขาย sales_amount = qty * price ใน fact_order_itemsSurrogate Keysสร้าง Primary Key ใหม่สำหรับ Dimension ด้วย ROW_NUMBER()1.7 Dimension Tables Modelingสร้าง Dimension Tables ทั้ง 7 ตารางเพื่อเก็บ Attribute รายละเอียดของธุรกิจ:SQL-- 1.7.1 Dim Customer
+CREATE OR REPLACE TABLE dim_customer AS
+SELECT ROW_NUMBER() OVER (ORDER BY customer_id) AS customer_sk, customer_id, city, TRY_CAST(signup_date AS DATE) AS signup_date
+FROM stg_customers;
+
+-- 1.7.2 Dim Product
+CREATE OR REPLACE TABLE dim_product AS
+SELECT ROW_NUMBER() OVER (ORDER BY product_id) AS product_sk, product_id, category_id, supplier_id, price
+FROM stg_products;
+
+-- 1.7.3 Dim Store
+CREATE OR REPLACE TABLE dim_store AS
+SELECT ROW_NUMBER() OVER (ORDER BY store_id) AS store_sk, store_id, city
+FROM stg_stores;
+
+-- 1.7.4 Dim Category
+CREATE OR REPLACE TABLE dim_category AS
+SELECT ROW_NUMBER() OVER (ORDER BY category_id) AS category_sk, category_id, category_name
+FROM stg_categories;
+
+-- 1.7.5 Dim Supplier
+CREATE OR REPLACE TABLE dim_supplier AS
+SELECT ROW_NUMBER() OVER (ORDER BY supplier_id) AS supplier_sk, supplier_id, country
+FROM stg_suppliers;
+
+-- 1.7.6 Dim Promotion
+CREATE OR REPLACE TABLE dim_promotion AS
+SELECT ROW_NUMBER() OVER (ORDER BY promotion_id) AS promotion_sk, promotion_id, discount
+FROM stg_promotions;
+
+-- 1.7.7 Dim Employee
+CREATE OR REPLACE TABLE dim_employee AS
+SELECT ROW_NUMBER() OVER (ORDER BY employee_id) AS employee_sk, employee_id, store_id, salary
+FROM stg_employees;
+1.8 Fact Tables Modelingสร้าง Fact Tables ทั้ง 5 ตารางเพื่อเก็บรายการธุรกรรมและค่าตัวเลขเชิงปริมาณ (Measures):SQL-- 1.8.1 Fact Orders
+CREATE OR REPLACE TABLE fact_orders AS
+SELECT order_id, customer_id, store_id, TRY_CAST(order_date AS DATE) AS order_date, promotion_id
+FROM stg_orders;
+
+-- 1.8.2 Fact Order Items (Calculated Measure: sales_amount)
+CREATE OR REPLACE TABLE fact_order_items AS
+SELECT order_item_id, order_id, product_id, qty, price, qty * price AS sales_amount
+FROM stg_order_items;
+
+-- 1.8.3 Fact Payments
+CREATE OR REPLACE TABLE fact_payments AS
+SELECT payment_id, order_id, amount
+FROM stg_payments;
+
+-- 1.8.4 Fact Shipments
+CREATE OR REPLACE TABLE fact_shipments AS
+SELECT shipment_id, order_id, status
+FROM stg_shipments;
+
+-- 1.8.5 Fact Returns
+CREATE OR REPLACE TABLE fact_returns AS
+SELECT return_id, order_item_id, refund
+FROM stg_returns;
+1.9 Data Warehouse Relationship Map (Star Schema)แผนผังแสดงความสัมพันธ์ระหว่าง Dimension Tables และ Fact Tables:                  ┌─────────────────┐
+                  │  dim_customer   │
+                  └────────┬────────┘
+                           │ customer_id
+                           ▼
+                  ┌─────────────────┐
+                  │   fact_orders   │ ◄─── store_id ────── ┌───────────────┐
+                  └────────┬────────┘                      │   dim_store   │
+                           │                               └───────────────┘
+                           │ order_id
+                           ▼
+                  ┌─────────────────┐
+                  │fact_order_items │ ◄─── product_id ──── ┌───────────────┐
+                  └────────┬────────┘                      │  dim_product  │
+                           │                               └───────┬───────┘
+                           │ order_item_id                         │
+                           ▼                                       ├─► dim_category
+                  ┌─────────────────┐                              │
+                  │  fact_returns   │                              └─► dim_supplier
+                  └─────────────────┘
+1.15 Data Pipeline Layers & SummaryLayerหน้าที่และขอบเขตงานออบเจกต์ตัวอย่างSource Layerจัดเก็บไฟล์ข้อมูลดิบต้นทางorders.csv, products.csvRaw / Staging Layerโหลดข้อมูลลงฐานข้อมูล DuckDB โดยตรงstg_orders, stg_productsTransform Layerทำ Data Cleaning, Type Cast, Key Validation, Join & CalculationSQL Scripts, qty * priceDimension Layerตารางเก็บรายละเอียดบริบทของธุรกิจdim_customer, dim_productFact Layerตารางเก็บข้อมูลธุรกรรมและตัวเลขการวัดผลfact_orders, fact_order_itemsAnalysis Layerนำข้อมูลที่จัดโครงสร้างแล้วไปวิเคราะห์เชิงลึกSales Analysis Query / DataFrame1.18 สรุปผลการดำเนินงาน (Executive Summary)หัวข้อผลการดำเนินงานแหล่งข้อมูล (Source)Google Drive (12 CSV Files)ขนาด Dataset รวม1,591,380 Records / 39 Columnsคุณภาพข้อมูล (Data Quality)Missing Values = 0, Duplicate Rows = 0, Invalid Keys = 0Staging Tables12 Tables (stg_*)Warehouse Outputs7 Dimension Tables (dim_*) และ 5 Fact Tables (fact_*)Key Metric Calculatedsales_amount = qty * priceสถานะการทำงานPipeline สมบูรณ์ พร้อมนำข้อมูลไปใช้งานวิเคราะห์ต่อ⚡ Complete Python Script for Google ColabPython# ============================================================
+# COMPLETE ELT PIPELINE SCRIPT
+# ============================================================
+
+!pip install duckdb -q
+
+import pandas as pd
+import duckdb
+import os
+from google.colab import drive
+
+# 1. SETUP
+drive.mount('/content/drive')
+path = '/content/drive/My Drive/miniproject_สินค้าปลีก'
+
+tables = [
+    'employees', 'returns', 'products', 'suppliers',
+    'categories', 'promotions', 'stores', 'customers',
+    'payments', 'orders', 'order_items', 'shipments'
+]
+
+# 2. EXTRACT
+loaded_data = {}
+for table in tables:
+    file_path = os.path.join(path, table + '.csv')
+    df = pd.read_csv(file_path)
+    loaded_data[table] = df
+    print(f"Extracted: {table}.csv -> {len(df):,} records")
+
+# 3. LOAD (STAGING)
+db_path = os.path.join(path, 'retail.duckdb')
+con = duckdb.connect(db_path)
+
+for table in tables:
+    file_path = os.path.join(path, table + '.csv')
+    con.execute(f"""
+        CREATE OR REPLACE TABLE stg_{table} AS
+        SELECT * FROM read_csv_auto(?)
+    """, [file_path])
+
+# 4. TRANSFORM: DIMENSION TABLES
+con.execute("CREATE OR REPLACE TABLE dim_customer AS SELECT ROW_NUMBER() OVER (ORDER BY customer_id) AS customer_sk, customer_id, city, TRY_CAST(signup_date AS DATE) AS signup_date FROM stg_customers")
+con.execute("CREATE OR REPLACE TABLE dim_product AS SELECT ROW_NUMBER() OVER (ORDER BY product_id) AS product_sk, product_id, category_id, supplier_id, price FROM stg_products")
+con.execute("CREATE OR REPLACE TABLE dim_store AS SELECT ROW_NUMBER() OVER (ORDER BY store_id) AS store_sk, store_id, city FROM stg_stores")
+con.execute("CREATE OR REPLACE TABLE dim_category AS SELECT ROW_NUMBER() OVER (ORDER BY category_id) AS category_sk, category_id, category_name FROM stg_categories")
+con.execute("CREATE OR REPLACE TABLE dim_supplier AS SELECT ROW_NUMBER() OVER (ORDER BY supplier_id) AS supplier_sk, supplier_id, country FROM stg_suppliers")
+con.execute("CREATE OR REPLACE TABLE dim_promotion AS SELECT ROW_NUMBER() OVER (ORDER BY promotion_id) AS promotion_sk, promotion_id, discount FROM stg_promotions")
+con.execute("CREATE OR REPLACE TABLE dim_employee AS SELECT ROW_NUMBER() OVER (ORDER BY employee_id) AS employee_sk, employee_id, store_id, salary FROM stg_employees")
+
+# 5. TRANSFORM: FACT TABLES
+con.execute("CREATE OR REPLACE TABLE fact_orders AS SELECT order_id, customer_id, store_id, TRY_CAST(order_date AS DATE) AS order_date, promotion_id FROM stg_orders")
+con.execute("CREATE OR REPLACE TABLE fact_order_items AS SELECT order_item_id, order_id, product_id, qty, price, qty * price AS sales_amount FROM stg_order_items")
+con.execute("CREATE OR REPLACE TABLE fact_payments AS SELECT payment_id, order_id, amount FROM stg_payments")
+con.execute("CREATE OR REPLACE TABLE fact_shipments AS SELECT shipment_id, order_id, status FROM stg_shipments")
+con.execute("CREATE OR REPLACE TABLE fact_returns AS SELECT return_id, order_item_id, refund FROM stg_returns")
+
+# 6. VALIDATION & ANALYSIS EXAMPLE
+sales_df = con.execute("""
+    SELECT o.order_date, p.category_id, SUM(oi.sales_amount) AS total_sales
+    FROM fact_order_items oi
+    JOIN fact_orders o ON oi.order_id = o.order_id
+    JOIN dim_product p ON oi.product_id = p.product_id
+    GROUP BY o.order_date, p.category_id
+    ORDER BY o.order_date LIMIT 5
+""").df()
+
+display(sales_df)
+con.close()
+print("🎉 ELT Pipeline Executed Successfully!")
