@@ -1440,7 +1440,7 @@ fact_payments
 
 โดย dim_employee ถูกจัดเก็บใน Data Warehouse แต่ไม่ได้เชื่อมกับ Fact Tables ใน Star Schema หลัก เนื่องจาก Source Data ไม่มี Relationship ที่เหมาะสมสำหรับเชื่อม Employee กับ Transaction โดยตรง
 ```
-#สรุปกระบวนการ ELT
+# สรุปกระบวนการ ELT
 
 กระบวนการ ELT ของ Retail Data Warehouse เริ่มจาก Extract โดยนำข้อมูลจากไฟล์ CSV จำนวน 12 ตารางเข้าสู่กระบวนการด้วย Python และ Pandas จากนั้นทำ Load ข้อมูลเข้าสู่ DuckDB ในรูปแบบ Staging Tables เพื่อใช้เป็นพื้นที่จัดเก็บและตรวจสอบข้อมูลก่อนการแปลง
 
@@ -1451,3 +1451,11 @@ fact_payments
 โดยรวมกระบวนการสามารถสรุปได้เป็น:
 
 CSV Source → Extract → DuckDB Staging → Cleaning & Validation → Transform → Dimension & Fact Tables → Data Warehouse → Data Analysis
+
+## Dashboard Link
+https://dadamini-project-aj-perm-manifest-get-a.streamlit.app/
+# Infographic
+
+# Source
+Datarspectrum Technology Training Center. (n.d.). Retail Data Warehouse – 12 Table 1M+ Rows Dataset [Data set]. Kaggle.
+https://www.kaggle.com/datasets/datarspectrum/retail-data-warehouse-12-table-1m-rows-dataset
