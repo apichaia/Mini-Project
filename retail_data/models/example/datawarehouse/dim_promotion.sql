@@ -17,15 +17,17 @@ unique_source AS (
         *,
         ROW_NUMBER() OVER (
             PARTITION BY promotion_id
+            ORDER BY promotion_id
         ) AS row_num
 
     FROM source
 
 )
 
-SELECT *
-
-EXCLUDE (row_num)
+SELECT
+    promotion_id,
+    discount,
+    insertion_timestamp
 
 FROM unique_source
 

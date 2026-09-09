@@ -1,15 +1,15 @@
 {{ config(
-
     partition_by = {
         "field": "order_date",
         "data_type": "date"
     }
-
 ) }}
 
 WITH source AS (
 
     SELECT
+
+        oi.order_item_id,
         oi.order_id,
         oi.product_id,
 
@@ -19,16 +19,16 @@ WITH source AS (
 
         p.supplier_id,
 
-        pay.payment_id,
-
         oi.qty AS quantity,
-        oi.price,
+        oi.price AS unit_price,
 
         promo.discount,
 
         CAST(o.order_date AS DATE) AS order_date,
 
-        oi.qty * oi.price AS sale_amount
+        oi.qty * oi.price AS sales_amount,
+
+        current_localtimestamp() AS insertion_timestamp
 
     FROM {{ ref('stg_orders') }} AS o
 
@@ -41,10 +41,7 @@ WITH source AS (
     LEFT JOIN {{ ref('stg_promotions') }} AS promo
         ON o.promotion_id = promo.promotion_id
 
-    LEFT JOIN {{ ref('stg_payments') }} AS pay
-        ON o.order_id = pay.order_id
-
-    WHERE oi.order_id IS NOT NULL
+    WHERE oi.order_item_id IS NOT NULL
 
 ),
 
@@ -53,14 +50,9 @@ unique_source AS (
     SELECT
         *,
         ROW_NUMBER() OVER (
-            PARTITION BY
-                order_id,
-                product_id,
-                customer_id,
-                store_id,
-                promotion_id,
-                order_date
-        ) AS row_number
+            PARTITION BY order_item_id
+            ORDER BY order_item_id
+        ) AS row_num
 
     FROM source
 
@@ -68,6 +60,7 @@ unique_source AS (
 
 SELECT
 
+    order_item_id,
     order_id,
     product_id,
     order_date,
@@ -75,13 +68,12 @@ SELECT
     store_id,
     promotion_id,
     supplier_id,
-    payment_id,
-
     quantity,
-    price,
+    unit_price,
     discount,
-    sale_amount
+    sales_amount,
+    insertion_timestamp
 
 FROM unique_source
 
-WHERE row_number = 1
+WHERE row_num = 1

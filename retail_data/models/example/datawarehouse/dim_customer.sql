@@ -18,15 +18,18 @@ unique_source AS (
         *,
         ROW_NUMBER() OVER (
             PARTITION BY customer_id
+            ORDER BY signup_date
         ) AS row_num
 
     FROM source
 
 )
 
-SELECT *
-
-EXCLUDE (row_num)
+SELECT
+    customer_id,
+    city,
+    signup_date,
+    insertion_timestamp
 
 FROM unique_source
 

@@ -19,15 +19,19 @@ unique_source AS (
         *,
         ROW_NUMBER() OVER (
             PARTITION BY product_id
+            ORDER BY product_id
         ) AS row_num
 
     FROM source
 
 )
 
-SELECT *
-
-EXCLUDE (row_num)
+SELECT
+    product_id,
+    category_id,
+    supplier_id,
+    price,
+    insertion_timestamp
 
 FROM unique_source
 

@@ -28,7 +28,23 @@ TARGET_TABLES = [
     "order_items",
     "shipments",
 ]
-
+# Dimension Tables
+DIMENSION_TABLES = [
+    "dim_date",
+    "dim_customer",
+    "dim_employee",
+    "dim_product",
+    "dim_promotion",
+    "dim_store",
+    "dim_supplier",
+]
+# Fact Tables
+FACT_TABLES = [
+    "fact_sales",
+    "fact_returns",
+    "fact_shipments",
+    "fact_payments",
+]
 # Database Path Resolution (อยู่โฟลเดอร์เดียวกับ app.py)
 PROJECT_ROOT = Path(__file__).resolve().parent
 DB_PATH = str(PROJECT_ROOT / "dev.duckdb")

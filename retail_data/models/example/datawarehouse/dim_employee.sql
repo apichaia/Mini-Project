@@ -18,15 +18,18 @@ unique_source AS (
         *,
         ROW_NUMBER() OVER (
             PARTITION BY employee_id
+            ORDER BY employee_id
         ) AS row_num
 
     FROM source
 
 )
 
-SELECT *
-
-EXCLUDE (row_num)
+SELECT
+    employee_id,
+    store_id,
+    salary,
+    insertion_timestamp
 
 FROM unique_source
 

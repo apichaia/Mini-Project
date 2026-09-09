@@ -17,15 +17,17 @@ unique_source AS (
         *,
         ROW_NUMBER() OVER (
             PARTITION BY store_id
+            ORDER BY store_id
         ) AS row_num
 
     FROM source
 
 )
 
-SELECT *
-
-EXCLUDE (row_num)
+SELECT
+    store_id,
+    city,
+    insertion_timestamp
 
 FROM unique_source
 

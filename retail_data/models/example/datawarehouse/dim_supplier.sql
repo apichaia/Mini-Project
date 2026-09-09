@@ -17,15 +17,17 @@ unique_source AS (
         *,
         ROW_NUMBER() OVER (
             PARTITION BY supplier_id
+            ORDER BY supplier_id
         ) AS row_num
 
     FROM source
 
 )
 
-SELECT *
-
-EXCLUDE (row_num)
+SELECT
+    supplier_id,
+    country,
+    insertion_timestamp
 
 FROM unique_source
 
