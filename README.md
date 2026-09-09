@@ -635,316 +635,402 @@ Dimension ที่สามารถใช้ร่วมกันระหว�
 
 ## การดำเนินงานด้านการจัดการข้อมูลด้วยกระบวนการ ELT
 
-1. การจัดการข้อมูลด้วยกระบวนการ ELT คือ
+## 1. กระบวนการ ELT (ELT Process)
 
-การจัดการข้อมูลของโครงงานนี้ประยุกต์ใช้แนวคิด ELT (Extract, Load, Transform) ซึ่งเป็นกระบวนการจัดการข้อมูลที่ประกอบด้วย 3 ขั้นตอน ได้แก่ การดึงข้อมูลจากแหล่งข้อมูลต้นทาง (Extract) การนำข้อมูลเข้าสู่ระบบฐานข้อมูลปลายทาง (Load) และการแปลงหรือปรับปรุงข้อมูลภายหลังจากที่ข้อมูลถูกโหลดเข้าสู่ระบบแล้ว (Transform)
+1.1 หลักการและแนวคิดของ ELT
 
-แนวทาง ELT แตกต่างจากกระบวนการ ETL (Extract, Transform, Load) ในลำดับการประมวลผลข้อมูล โดย ETL จะทำการแปลงข้อมูลก่อนนำเข้าสู่ฐานข้อมูล ในขณะที่ ELT จะนำข้อมูลเข้าสู่ระบบปลายทางก่อน แล้วจึงดำเนินการตรวจสอบ ทำความสะอาด และแปลงข้อมูลภายในระบบปลายทาง วิธีการดังกล่าวช่วยให้สามารถเก็บข้อมูลต้นฉบับไว้เป็น Raw Data และสามารถย้อนกลับมาตรวจสอบหรือประมวลผลข้อมูลใหม่ได้ในภายหลัง
+โครงงานนี้ใช้กระบวนการ ELT (Extract, Load, Transform) ในการจัดการข้อมูล โดยมีวัตถุประสงค์เพื่อรวบรวมข้อมูลจากระบบต้นทาง จัดเก็บข้อมูลในฐานข้อมูล และดำเนินการทำความสะอาดและแปลงข้อมูลภายหลังจากที่ข้อมูลถูก Load เข้าสู่ฐานข้อมูลแล้ว
 
-สำหรับโครงงานนี้ใช้ Google Colab เป็นสภาพแวดล้อมในการดำเนินงานร่วมกับ Python และ Pandas เพื่อดึงข้อมูลจาก Google Drive ตรวจสอบข้อมูล และเตรียมข้อมูลสำหรับนำเข้าสู่ระบบฐานข้อมูลปลายทาง
+ELT ประกอบด้วย 3 ขั้นตอนหลัก ได้แก่
 
-2. ขั้นตอน Extract
+Extract – การดึงข้อมูลจากแหล่งข้อมูลต้นทาง
+Load – การนำข้อมูลเข้าสู่ฐานข้อมูลในรูปแบบ Raw/Staging
+Transform – การทำความสะอาด แปลง และจัดโครงสร้างข้อมูลเพื่อเตรียมเข้าสู่ Data Warehouse
 
-2.1 แหล่งข้อมูล
+| ขั้นตอน (Stage) | ชื่อชั้นข้อมูล (Layer Name) | เครื่องมือ / เทคโนโลยี (Tools) | หน้าที่และการทำงาน (Function / Tasks) |
+| :--- | :--- | :--- | :--- |
+| **1. Source** | **แหล่งข้อมูลต้นทาง** | Google Drive / CSV Files | จัดเก็บไฟล์ข้อมูลดิบรูปแบบ CSV บน Google Drive พร้อมสำหรับการดึงไปใช้งาน |
+| **2. Extract** | **Raw / Staging** | DuckDB | ทำการดึงข้อมูลดิบ (Extract) เข้าสู่พื้นที่พักข้อมูล (Staging Area) เพื่อเตรียมนำไปแปลงสภาพ |
+| **3. Transform** | **Transform Layer** | Data Processing Engine | ทำการทำความสะอาดข้อมูล (Cleaning), เชื่อมโยงข้อมูล (Join), แปลงชนิดข้อมูล (Type Conversion) และคำนวณค่าต่างๆ (Calculation) |
+| **4. Storage** | **Data Warehouse** | Relational / Analytical DB | จัดเก็บข้อมูลที่ผ่านการแปลงแล้วลงในรูปแบบ **Fact Tables** (ตารางข้อเท็จจริง) และ **Dimension Tables** (ตารางมิติ) |
+| **5. Output** | **Analysis** | BI Tools / Dashboards / SQL | นำข้อมูลที่จัดเก็บใน Data Warehouse ไปวิเคราะห์ ทำรายงาน หรือนำเสนอต่อผู้ใช้งาน |
 
-ข้อมูลที่ใช้ในการดำเนินโครงงานเป็น Dataset เกี่ยวกับธุรกิจค้าปลีก โดยจัดเก็บอยู่ใน Google Drive และประกอบด้วยข้อมูลที่เกี่ยวข้องกับการดำเนินงานของธุรกิจ เช่น ข้อมูลลูกค้า สินค้า ร้านค้า พนักงาน ผู้จัดจำหน่าย โปรโมชั่น คำสั่งซื้อ รายการสินค้าในการสั่งซื้อ การชำระเงิน การจัดส่ง และการคืนสินค้า
+## 1.2 โครงสร้าง Dataset
 
-ในการดำเนินงาน ได้เชื่อมต่อ Google Drive เข้ากับ Google Colab เพื่อให้สามารถเข้าถึงไฟล์ Dataset ได้ จากนั้นตรวจสอบรายการไฟล์และประเภทของข้อมูลก่อนนำเข้าสู่กระบวนการประมวลผล
+Dataset ที่ใช้ในโครงงานเป็นข้อมูลระบบค้าปลีก ประกอบด้วยข้อมูลเกี่ยวกับลูกค้า สินค้า ร้านค้า คำสั่งซื้อ การชำระเงิน การจัดส่ง การคืนสินค้า โปรโมชั่น และข้อมูลที่เกี่ยวข้องกับการดำเนินงานของธุรกิจค้าปลีก
 
-2.2 การนำข้อมูลเข้าสู่ Google Colab
-
-หลังจากเชื่อมต่อ Google Drive แล้ว ได้ใช้ Python และ Pandas ในการอ่านข้อมูลจากไฟล์ CSV และจัดเก็บข้อมูลแต่ละตารางในรูปแบบ DataFrame เพื่อใช้ในการตรวจสอบและจัดการข้อมูล
-
-จากการตรวจสอบพบ Dataset หลักจำนวน 12 ตาราง ได้แก่
-
-employees
-returns
-products
-suppliers
-categories
-promotions
-stores
-customers
-payments
-orders
-order_items
-shipments
-
+จากการตรวจสอบข้อมูลพบ 12 ตารางหลัก ดังนี้
 นอกจากนี้ยังพบไฟล์ข้อมูลประเภท TXT และ ZIP ซึ่งเป็นข้อมูลตัวอย่างขนาดเล็ก จึงแยกออกจาก Dataset หลักเพื่อให้การวิเคราะห์โครงสร้างฐานข้อมูลค้าปลีกมีความชัดเจน
 
-2.3 ผลการ Extract ข้อมูล
+| ลำดับ | ตาราง | Records | Columns | ประเภทข้อมูล |
+| :---: | :--- | :---: | :---: | :---: |
+| 1 | employees | 1,000 | 3 | Master |
+| 2 | returns | 30,000 | 3 | Transaction |
+| 3 | products | 10,000 | 4 | Master |
+| 4 | suppliers | 200 | 2 | Master |
+| 5 | categories | 30 | 2 | Master |
+| 6 | promotions | 50 | 2 | Master |
+| 7 | stores | 100 | 2 | Master |
+| 8 | customers | 50,000 | 3 | Master |
+| 9 | payments | 300,000 | 3 | Transaction |
+| 10 | orders | 300,000 | 5 | Transaction |
+| 11 | order_items | 600,000 | 5 | Transaction |
+| 12 | shipments | 300,000 | 3 | Transaction |
 
-จากการตรวจสอบจำนวน Records และ Columns ของ Dataset หลัก พบรายละเอียดดังตาราง
+รวมข้อมูลทั้งหมด
+<1,591,380 Records และ 39 Columns>
 
-## รายละเอียดตารางข้อมูล
 
-| ลำดับ | ตาราง | จำนวน Records | จำนวน Columns | รายละเอียด |
-|:---:|---|---:|---:|---|
-| 1 | `employees` | 1,000 | 3 | ข้อมูลพนักงาน |
-| 2 | `returns` | 30,000 | 3 | ข้อมูลการคืนสินค้า |
-| 3 | `products` | 10,000 | 4 | ข้อมูลสินค้า |
-| 4 | `suppliers` | 200 | 2 | ข้อมูลผู้จัดจำหน่าย |
-| 5 | `categories` | 30 | 2 | ข้อมูลประเภทสินค้า |
-| 6 | `promotions` | 50 | 2 | ข้อมูลโปรโมชั่น |
-| 7 | `stores` | 100 | 2 | ข้อมูลสาขา |
-| 8 | `customers` | 50,000 | 3 | ข้อมูลลูกค้า |
-| 9 | `payments` | 300,000 | 3 | ข้อมูลการชำระเงิน |
-| 10 | `orders` | 300,000 | 5 | ข้อมูลคำสั่งซื้อ |
-| 11 | `order_items` | 600,000 | 5 | รายละเอียดสินค้าในคำสั่งซื้อ |
-| 12 | `shipments` | 300,000 | 3 | ข้อมูลการจัดส่ง |
+# Retail Data Warehouse — End-to-End ELT Pipeline with DuckDB
 
-จากตารางข้างต้นพบว่า Dataset หลักมีข้อมูลทั้งหมด 1,631,380 Records และ 39 Columns โดยตาราง order_items มีจำนวน Records มากที่สุด คือ 600,000 Records รองลงมาคือ orders, payments และ shipments ซึ่งมีตารางละ 300,000 Records สะท้อนให้เห็นว่า Dataset มีข้อมูลธุรกรรมจำนวนมากและมีโครงสร้างที่สอดคล้องกับระบบธุรกิจค้าปลีก
+> **Project Documentation | Extract → Load → Transform Architecture**  
+> *เอกสารสรุปการพัฒนาระบบ คลังข้อมูลสินค้าปลีก ด้วย Python, Pandas และ DuckDB*
 
-3. ขั้นตอน Load
+การดำเนินงานใช้ **Google Colab** ร่วมกับ **DuckDB** และ **Pandas**
 
-หลังจากดำเนินการ Extract ข้อมูลจาก Google Drive แล้ว ข้อมูลถูกนำเข้าสู่ระบบฐานข้อมูลปลายทางเพื่อจัดเก็บข้อมูลก่อนเข้าสู่กระบวนการ Transform ซึ่งเป็นลักษณะสำคัญของกระบวนการ ELT
+```python
+# 1.3.1 ติดตั้ง Library และ Import
+!pip install duckdb -q
 
-ข้อมูลที่นำเข้าสู่ระบบประกอบด้วยตารางหลัก ได้แก่ customers, products, orders, order_items, payments, shipments, returns รวมถึงตารางข้อมูลสนับสนุน ได้แก่ employees, suppliers, categories, stores และ promotions
+import pandas as pd
+import duckdb
+import os
+from google.colab import drive
 
-การ Load ข้อมูลในขั้นตอนนี้มีวัตถุประสงค์เพื่อรักษาข้อมูลจากแหล่งต้นทางให้ครบถ้วนก่อนดำเนินการแปลงข้อมูล โดยสามารถเก็บข้อมูลในลักษณะ Raw Data เพื่อใช้เป็นข้อมูลต้นฉบับสำหรับตรวจสอบย้อนกลับได้
+# 1.3.2 เชื่อมต่อ Google Drive
+drive.mount('/content/drive')
 
-3.1 การตรวจสอบข้อมูลหลัง Load
+# 1.3.3 กำหนด Path ของ Dataset
+path = '/content/drive/My Drive/miniproject_สินค้าปลีก'
+print("Dataset Path:", path)
+print("Files:", os.listdir(path))
+1.4 Extract Phaseกระบวนการดึงข้อมูลจากไฟล์ CSV ทั้ง 12 ตารางเข้ามาประมวลผลบน PythonPython# 1.4.2 กำหนดรายชื่อตาราง
+tables = [
+    'employees', 'returns', 'products', 'suppliers',
+    'categories', 'promotions', 'stores', 'customers',
+    'payments', 'orders', 'order_items', 'shipments'
+]
 
-หลังจากนำข้อมูลเข้าสู่ระบบปลายทาง ได้ทำการตรวจสอบจำนวน Records ของแต่ละตารางอีกครั้ง เพื่อเปรียบเทียบกับจำนวน Records จากแหล่งข้อมูลต้นทาง
+# 1.4.3 อ่านข้อมูล CSV เข้า Pandas DataFrame
+loaded_data = {}
+for table in tables:
+    file_path = os.path.join(path, table + '.csv')
+    df = pd.read_csv(file_path)
+    loaded_data[table] = df
+    print(f"{table}.csv -> {len(df):,} records")
+1.5 Load Phase (Staging Layer)นำข้อมูลจาก Pandas/CSV เข้าสู่ DuckDB โดยสร้างเป็น Staging Tables (stg_*) เพื่อทำ Persistence ข้อมูลก่อน TransformPython# 1.5.2 สร้างการเชื่อมต่อ DuckDB
+db_path = os.path.join(path, 'retail.duckdb')
+con = duckdb.connect(db_path)
 
-ผลการตรวจสอบมีวัตถุประสงค์เพื่อยืนยันว่า การนำข้อมูลเข้าสู่ระบบปลายทางไม่ได้ทำให้ข้อมูลสูญหายหรือจำนวน Records เปลี่ยนแปลงโดยไม่มีเหตุผล
+# 1.5.3 Load CSV -> Staging Tables
+for table in tables:
+    file_path = os.path.join(path, table + '.csv')
+    con.execute(f"""
+        CREATE OR REPLACE TABLE stg_{table} AS
+        SELECT * FROM read_csv_auto(?)
+    """, [file_path])
+    print(f"Loaded: {table}.csv -> stg_{table}")
+ข้อดีของการใช้ Staging LayerData Persistence: เก็บข้อมูลจาก Source ไว้ใน Database โดยตรงPerformance: ลดการอ่านไฟล์ CSV ซ้ำหลายครั้งValidation: ตรวจสอบความถูกต้อง (Missing Values, Duplicates, Data Type) ก่อนนำไป TransformArchitecture Separation: แยก Source Data ออกจาก Transformation Logic อย่างชัดเจน1.6 Transform Phase & Data Cleaningทำการตรวจสอบคุณภาพข้อมูล และปรับแต่งให้พร้อมใช้งานสำหรับ Data Warehouse1.6.1 Data Quality Check ScriptsPython# ตรวจสอบ Missing Values และ Duplicates
+for table in tables:
+    df = con.execute(f"SELECT * FROM stg_{table}").df()
+    print("=" * 50)
+    print(f"Table: {table}")
+    print("Missing Values:\n", df.isnull().sum())
+    print("Duplicate Records:", df.duplicated().sum())
+1.6.2 Data Cleaning & Transformation Rulesกฎการจัดการ (Rule)รายละเอียดการทำงานMissing Valueตรวจสอบค่าว่างทุกคอลัมน์ (พบ 0 Missing Values)Duplicatesตรวจสอบและกำจัดแถวที่ซ้ำซ้อน (พบ 0 Duplicate Rows)Primary Key Validationตรวจสอบความซ้ำซ้อนของ PK (COUNT > 1 = 0)Foreign Key Validationตรวจสอบ Referential Integrity ระหว่างตารางDate Conversionแปลง Text/String Date เป็น DATE Type ผ่าน TRY_CAST()Measure Calculationคำนวณยอดขาย sales_amount = qty * price ใน fact_order_itemsSurrogate Keysสร้าง Primary Key ใหม่สำหรับ Dimension ด้วย ROW_NUMBER()1.7 Dimension Tables Modelingสร้าง Dimension Tables ทั้ง 7 ตารางเพื่อเก็บ Attribute รายละเอียดของธุรกิจ:SQL-- 1.7.1 Dim Customer
+CREATE OR REPLACE TABLE dim_customer AS
+SELECT ROW_NUMBER() OVER (ORDER BY customer_id) AS customer_sk, customer_id, city, TRY_CAST(signup_date AS DATE) AS signup_date
+FROM stg_customers;
 
-หากจำนวน Records ก่อนและหลัง Load มีค่าเท่ากัน สามารถยืนยันได้ในระดับหนึ่งว่าข้อมูลถูกนำเข้าสู่ระบบอย่างครบถ้วน
+-- 1.7.2 Dim Product
+CREATE OR REPLACE TABLE dim_product AS
+SELECT ROW_NUMBER() OVER (ORDER BY product_id) AS product_sk, product_id, category_id, supplier_id, price
+FROM stg_products;
 
-4. ขั้นตอน Transform
+-- 1.7.3 Dim Store
+CREATE OR REPLACE TABLE dim_store AS
+SELECT ROW_NUMBER() OVER (ORDER BY store_id) AS store_sk, store_id, city
+FROM stg_stores;
 
-หลังจากข้อมูลถูก Load เข้าสู่ระบบปลายทางแล้ว จึงดำเนินการ Transform โดยมีวัตถุประสงค์เพื่อ ตรวจสอบคุณภาพข้อมูล ทำความสะอาดข้อมูล ปรับรูปแบบข้อมูล และเตรียมข้อมูลให้เหมาะสมกับการวิเคราะห์
+-- 1.7.4 Dim Category
+CREATE OR REPLACE TABLE dim_category AS
+SELECT ROW_NUMBER() OVER (ORDER BY category_id) AS category_sk, category_id, category_name
+FROM stg_categories;
 
-การ Transform ของโครงงานประกอบด้วยการดำเนินงานดังต่อไปนี้
+-- 1.7.5 Dim Supplier
+CREATE OR REPLACE TABLE dim_supplier AS
+SELECT ROW_NUMBER() OVER (ORDER BY supplier_id) AS supplier_sk, supplier_id, country
+FROM stg_suppliers;
 
-4.1 การตรวจสอบโครงสร้างข้อมูล
+-- 1.7.6 Dim Promotion
+CREATE OR REPLACE TABLE dim_promotion AS
+SELECT ROW_NUMBER() OVER (ORDER BY promotion_id) AS promotion_sk, promotion_id, discount
+FROM stg_promotions;
 
-ทำการตรวจสอบชื่อ Column จำนวน Column และ Data Type ของแต่ละตาราง เพื่อให้แน่ใจว่าข้อมูลมีโครงสร้างเหมาะสมกับลักษณะของข้อมูล
+-- 1.7.7 Dim Employee
+CREATE OR REPLACE TABLE dim_employee AS
+SELECT ROW_NUMBER() OVER (ORDER BY employee_id) AS employee_sk, employee_id, store_id, salary
+FROM stg_employees;
+1.8 Fact Tables Modelingสร้าง Fact Tables ทั้ง 5 ตารางเพื่อเก็บรายการธุรกรรมและค่าตัวเลขเชิงปริมาณ (Measures):SQL-- 1.8.1 Fact Orders
+CREATE OR REPLACE TABLE fact_orders AS
+SELECT order_id, customer_id, store_id, TRY_CAST(order_date AS DATE) AS order_date, promotion_id
+FROM stg_orders;
 
-ตัวอย่างเช่น `ตาราง order `ประกอบด้วย
-| ตาราง | รายละเอียด | 
-|:---:|---|
-|`order_id`| เป็นรหัสคำสั่งซื้อ|
-|`store_id`| เป็นรหัสร้านค้า|
-|`order_date`| เป็นวันที่สั่งซื้อ|
-|`promotion_id` |เป็นรหัสโปรโมชั่น|
+-- 1.8.2 Fact Order Items (Calculated Measure: sales_amount)
+CREATE OR REPLACE TABLE fact_order_items AS
+SELECT order_item_id, order_id, product_id, qty, price, qty * price AS sales_amount
+FROM stg_order_items;
 
-ส่วนตาราง order_items ประกอบด้วย
-| ตาราง | 
-|:---:|
-|`order_item_id`|
-|`order_id`|
-|`product_id`|
-|`qty`|
-|`price`|
+-- 1.8.3 Fact Payments
+CREATE OR REPLACE TABLE fact_payments AS
+SELECT payment_id, order_id, amount
+FROM stg_payments;
 
-ข้อมูลประเภท ID และจำนวนสินค้าเป็นข้อมูลเชิงตัวเลข ขณะที่ข้อมูลประเภทชื่อ เมือง หรือสถานะเป็นข้อมูลข้อความ
+-- 1.8.4 Fact Shipments
+CREATE OR REPLACE TABLE fact_shipments AS
+SELECT shipment_id, order_id, status
+FROM stg_shipments;
 
-5. การตรวจสอบ Missing Value
+-- 1.8.5 Fact Returns
+CREATE OR REPLACE TABLE fact_returns AS
+SELECT return_id, order_item_id, refund
+FROM stg_returns;
 
-ดำเนินการตรวจสอบ Missing Value ของทุก Column ในแต่ละตาราง เพื่อค้นหาข้อมูลที่ไม่มีค่า ซึ่งอาจส่งผลกระทบต่อการวิเคราะห์ในขั้นตอนต่อไป
+1.9 Data Warehouse Relationship Map (Star Schema)แผนผังแสดงความสัมพันธ์ระหว่าง Dimension Tables และ Fact Tables:                  ┌─────────────────┐
+                  │  dim_customer   │
+                  └────────┬────────┘
+                           │ customer_id
+                           ▼
+                  ┌─────────────────┐
+                  │   fact_orders   │ ◄─── store_id ────── ┌───────────────┐
+                  └────────┬────────┘                      │   dim_store   │
+                           │                               └───────────────┘
+                           │ order_id
+                           ▼
+                  ┌─────────────────┐
+                  │fact_order_items │ ◄─── product_id ──── ┌───────────────┐
+                  └────────┬────────┘                      │  dim_product  │
+                           │                               └───────┬───────┘
+                           │ order_item_id                         │
+                           ▼                                       ├─► dim_category
+                  ┌─────────────────┐                              │
+                  │  fact_returns   │                              └─► dim_supplier
+                  └─────────────────┘
 
-จากผลการตรวจสอบ Dataset หลัก พบว่า ไม่พบ Missing Value ใน Column ของตารางหลักทั้ง 12 ตาราง
+Markdown## 1.10 ตัวอย่างการ Transform ด้วย JOIN
 
-ดังนั้นจึงไม่มีความจำเป็นต้องดำเนินการเติมค่าที่หายไป เช่น ค่าเฉลี่ย ค่ามัธยฐาน หรือค่าที่กำหนดขึ้นเอง และไม่จำเป็นต้องลบ Records เนื่องจากไม่พบข้อมูลสูญหายในขั้นตอนการตรวจสอบเบื้องต้น
+ตัวอย่างการสร้างชุดข้อมูลสำหรับวิเคราะห์ยอดขาย โดยการเชื่อมโยงข้อมูลระหว่าง Fact Tables และ Dimension Tables:
 
-6. การตรวจสอบ Duplicate Records
+```python
+sales_analysis = con.execute("""
+SELECT
+    oi.order_id,
+    oi.product_id,
+    p.category_id,
+    p.supplier_id,
+    o.customer_id,
+    o.store_id,
+    o.order_date,
+    o.promotion_id,
+    oi.qty,
+    oi.price,
+    oi.sales_amount
+FROM fact_order_items oi
+JOIN fact_orders o
+    ON oi.order_id = o.order_id
+JOIN dim_product p
+    ON oi.product_id = p.product_id
+""").df()
 
-ดำเนินการตรวจสอบข้อมูลซ้ำในแต่ละตาราง โดยพิจารณาการซ้ำของข้อมูลในระดับทั้ง Records
+## 1.11 Data Cleaning and Transformation Rules
 
-ผลการตรวจสอบพบว่า ไม่พบ Duplicate Records ในตารางหลัก
+กฎเกณฑ์และมาตรฐานในการจัดการและแปลงสภาพข้อมูล (Transformation Rules):
 
-ผลดังกล่าวแสดงให้เห็นว่าไม่พบ Records ที่มีข้อมูลทุก Column เหมือนกันจากการตรวจสอบเบื้องต้น ซึ่งช่วยลดความเสี่ยงในการนับข้อมูลซ้ำเมื่อข้อมูลถูกนำไปใช้ในการวิเคราะห์
+| รายการ (Item) | กฎการจัดการข้อมูล (Rules) |
+| :--- | :--- |
+| **Missing Value** | ตรวจสอบและจัดการค่าว่างในทุก Column |
+| **Duplicate** | ตรวจสอบและกำจัดข้อมูลที่ซ้ำซ้อน (Duplicate Records) |
+| **Primary Key** | ตรวจสอบ Uniqueness (ต้องไม่มีค่าซ้ำ) |
+| **Foreign Key** | ตรวจสอบความสัมพันธ์และความสมบูรณ์ของข้อมูลระหว่างตาราง |
+| **Date** | แปลงชนิดข้อมูลเป็น `DATE` |
+| **Quantity** | กำหนดชนิดข้อมูลเป็น `INTEGER` |
+| **Price** | กำหนดชนิดข้อมูลเป็น `NUMERIC` |
+| **Discount** | กำหนดชนิดข้อมูลเป็น `NUMERIC` |
+| **Status** | กำหนดชนิดข้อมูลเป็น `VARCHAR` / `STRING` |
+| **Sales Amount** | คำนวณจากสูตร $Qty \times Price$ |
+| **Surrogate Key** | สร้าง SK ขึ้นใหม่สำหรับ Dimension Tables ด้วย `ROW_NUMBER()` |
 
-อย่างไรก็ตาม การตรวจสอบ Duplicate Records ในระดับทั้งแถวแตกต่างจากการตรวจสอบค่าซ้ำของ Primary Key ดังนั้นจึงควรตรวจสอบ Primary Key แยกต่างหากเพื่อยืนยันความถูกต้องของโครงสร้างฐานข้อมูล
+1.12 การตรวจสอบ Primary Keyสคริปต์สำหรับตรวจสอบความถูกต้องของ Primary Key ในแต่ละ Staging Table ว่าไม่มีค่าซ้ำ:Pythonprimary_keys = {
+    'employees': 'employee_id',
+    'returns': 'return_id',
+    'products': 'product_id',
+    'suppliers': 'supplier_id',
+    'categories': 'category_id',
+    'promotions': 'promotion_id',
+    'stores': 'store_id',
+    'customers': 'customer_id',
+    'payments': 'payment_id',
+    'orders': 'order_id',
+    'order_items': 'order_item_id',
+    'shipments': 'shipment_id'
+}
 
-7. การตรวจสอบ Primary Key
+for table, pk in primary_keys.items():
+    result = con.execute(f"""
+        SELECT {pk}, COUNT(*) AS count
+        FROM stg_{table}
+        GROUP BY {pk}
+        HAVING COUNT(*) > 1
+    """).df()
 
-ดำเนินการตรวจสอบ Column ที่ทำหน้าที่เป็นรหัสประจำ Records ของแต่ละตาราง เช่น
+    print(f"{table:15} | Duplicate PK = {len(result):,}")
+หมายเหตุ: หากผลลัพธ์แสดง Duplicate PK = 0 แสดงว่า Primary Key ของตารางนั้นๆ มีความถูกต้องและไม่พบรายการซ้ำ
 
-| ตาราง | Primary Key |
-|:---:|---|
-| `employees` | `employee_id` |
-| `returns` | `return_id` |
-| `products` | `product_id` |
-| `suppliers` | `supplier_id` |
-| `categories` | `category_id` |
-| `promotions` | `promotion_id` |
-| `stores` | `store_id` |
-| `customers` | `customer_id` |
-| `payments` | `payment_id` |
-| `orders` | `order_id` |
-| `order_items` | `order_item_id` |
-| `shipments` | `shipment_id` |
+1.13 การตรวจสอบ Foreign Keyตัวอย่างการตรวจสอบ Referential Integrity เพื่อเช็กว่า customer_id ในตาราง fact_orders มีตัวตนอยู่ในตาราง
+dim_customer หรือไม่:
 
-การตรวจสอบ Primary Key มีวัตถุประสงค์เพื่อค้นหาค่าที่ซ้ำกัน เนื่องจาก Primary Key ควรสามารถระบุ Records แต่ละรายการได้อย่างเป็นเอกลักษณ์
+Pythonresult = con.execute("""
+SELECT COUNT(*) AS invalid_customer
+FROM fact_orders o
+LEFT JOIN dim_customer c
+    ON o.customer_id = c.customer_id
+WHERE c.customer_id IS NULL
+""").df()
 
-8. การตรวจสอบความสัมพันธ์ระหว่างตาราง
+display(result)
+หมายเหตุ: หากผลลัพธ์ invalid_customer เท่ากับ 0 แสดงว่า customer_id ในรายการสั่งซื้อสามารถเชื่อมโยงกับข้อมูลลูกค้าได้ครบถ้วนถูกต้อง
 
-เนื่องจาก Dataset มีลักษณะเป็นข้อมูลหลายตาราง จึงต้องตรวจสอบความสัมพันธ์ระหว่างตารางด้วย โดยใช้รหัสที่เชื่อมโยงระหว่างตาราง เช่น
 
-## 8. ความสัมพันธ์ระหว่างตาราง
+1.14 การตรวจสอบผลลัพธ์ของ Dimension และ Fact Tablesสคริปต์สำหรับตรวจสอบจำนวน Records ทั้งหมดในตาราง Dimension และ Fact หลังจากการ Transform:Pythonfinal_tables = [
+    'dim_customer',
+    'dim_product',
+    'dim_store',
+    'dim_category',
+    'dim_supplier',
+    'dim_promotion',
+    'dim_employee',
+    'fact_orders',
+    'fact_order_items',
+    'fact_payments',
+    'fact_shipments',
+    'fact_returns'
+]
 
-### 8.1 Customers และ Orders
+for table in final_tables:
+    count = con.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+    print(f"{table:20} : {count:,} records")
 
-| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
-|:---|:---:|:---|:---:|:---|
-| `customers` | `customer_id` | `orders` | `customer_id` | `customer_id` ในตาราง `orders` ใช้เชื่อมโยงไปยัง `customer_id` ในตาราง `customers` |
 
-**ความสัมพันธ์**
+1.15 ELT Data Flowโครงสร้างและเส้นทางการไหลของข้อมูล (Data Architecture) แบ่งออกเป็น 4 Layer หลัก:[ Layer 1: Source Layer ]
+  Google Drive (12 CSV Files)
+        │
+        ├── employees.csv, returns.csv, products.csv, suppliers.csv, categories.csv,
+        └── promotions.csv, stores.csv, customers.csv, payments.csv, orders.csv, ...
+        │
+        ▼
+[ Layer 2: Raw / Staging Layer ]
+  DuckDB Persistent Storage
+        │
+        ├── stg_employees, stg_returns, stg_products, stg_suppliers, stg_categories,
+        └── stg_promotions, stg_stores, stg_customers, stg_payments, stg_orders, ...
+        │
+        ▼
+[ Layer 3: Transform Layer ]
+  Data Processing & Cleaning
+        │
+        ├── Cleaning ──► Data Type Conversion ──► Duplicate Check
+        └── Key Validation ──► Join ──► Calculations (qty * price)
+        │
+        ▼
+[ Layer 4: Data Warehouse Layer ]
+  Star Schema Architecture
+        │
+        ├─► DIMENSION: Customer, Product, Store, Category, Supplier, Promotion, Employee
+        └─► FACT     : Orders, OrderItems, Payments, Shipments, Returns
 
-`customers.customer_id`  
-↓  
-`orders.customer_id`
+## 1.16 ตารางสรุปแต่ละ Layer
+
+| Layer | หน้าที่และความรับผิดชอบ | ตัวอย่างออบเจกต์ |
+| :--- | :--- | :--- |
+| **Source Layer** | จัดเก็บไฟล์ข้อมูลดิบต้นทาง | ไฟล์ CSV บน Google Drive |
+| **Raw / Staging Layer** | จัดเก็บข้อมูลดิบที่โหลดเข้าฐานข้อมูล DuckDB โดยตรง | `stg_orders`, `stg_products` |
+| **Transform Layer** | ดำเนินการทำความสะอาด, เปลี่ยนชนิดข้อมูล, JOIN และคำนวณ Business Logic | SQL Scripts, `qty * price` |
+| **Dimension Layer** | จัดเก็บข้อมูลรายละเอียดและคุณลักษณะรายมิติของธุรกิจ | `dim_product`, `dim_customer` |
+| **Fact Layer** | จัดเก็บข้อมูลธุรกรรมและตัวเลขวัดผลเชิงปริมาณ | `fact_orders`, `fact_order_items` |
+| **Analysis Layer** | นำเสนอชุดข้อมูลที่ผ่านการ Transform แล้วไปใช้งานต่อในระบบ BI หรือ Analysis | Sales Analysis DataFrame |
+
+
+## 1.17 Summary of ELT
+
+กระบวนการ **ELT (Extract, Load, Transform)** ของโครงงานเริ่มต้นจากขั้นตอน **Extract** โดยการดึงข้อมูลจากไฟล์ CSV จำนวน 12 ตาราง (`employees`, `returns`, `products`, `suppliers`, `categories`, `promotions`, `stores`, `customers`, `payments`, `orders`, `order_items` และ `shipments`) รวมทั้งสิ้น **1,631,380 Records** และ **39 Columns** จาก Google Drive เข้าสู่ Google Colab ด้วย Python และ Pandas
+
+ถัดมาเป็นขั้นตอน **Load** โดยการนำข้อมูลดิบเข้าสู่ฐานข้อมูล **DuckDB** ในรูปแบบ Staging Tables (ตั้งชื่อนำหน้าด้วย `stg_` เช่น `stg_orders`, `stg_products`) เพื่อทำ Data Persistence และใช้เป็นพื้นที่พักข้อมูลสำหรับตรวจสอบคุณภาพก่อนเข้าสู่กระบวนการถัดไป
+
+ในขั้นตอน **Transform** ได้ทำการตรวจสอบและทำความสะอาดข้อมูล (Data Cleaning) ได้แก่ การตรวจหา Missing Values, Duplicate Records, การทำ Primary/Foreign Key Validation, การแปลงชนิดข้อมูลวันที่ (`DATE`) รวมถึงการสร้าง Business Metric ใหม่ เช่น `sales_amount` ($Qty \times Price$) จากนั้นจึงจัดโครงสร้างข้อมูลให้อยู่ในรูป **Star Schema** ประกอบด้วย 7 Dimension Tables และ 5 Fact Tables
+
+Google Drive (Source)
+│
+▼
+CSV Dataset
+│
+▼  [ EXTRACT ] (Python + Pandas)
+│
+RAW / STAGING (DuckDB)
+│
+▼  [ LOAD ]
+│
+DuckDB
+│
+▼  [ TRANSFORM ] (SQL + DuckDB)
+├─► Cleaning & Validation (Missing / Duplicates / Keys)
+├─► Data Type Conversion (DATE, NUMERIC, etc.)
+├─► Joins & Calculations (sales_amount = qty * price)
+│
+▼
+DIMENSION + FACT TABLES
+│
+▼
+DATA WAREHOUSE
+│
+▼
+DATA ANALYSIS
+
 
 ---
 
-### 8.2 Orders และ Order Items
+## 1.18 สรุปผลการดำเนินงาน
 
-| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
-|:---|:---:|:---|:---:|:---|
-| `orders` | `order_id` | `order_items` | `order_id` | `order_id` ใช้เชื่อมโยงคำสั่งซื้อกับรายละเอียดสินค้าที่อยู่ภายในคำสั่งซื้อนั้น |
+ตารางสรุปรายละเอียดและผลลัพธ์จากการดำเนินงานกระบวนการ ELT:
 
-**ความสัมพันธ์**
-
-`orders.order_id`  
-↓  
-`order_items.order_id`
-
----
-
-### 8.3 Products และ Order Items
-
-| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
-|:---|:---:|:---|:---:|:---|
-| `products` | `product_id` | `order_items` | `product_id` | `product_id` ใช้เชื่อมโยงข้อมูลสินค้าเข้ากับรายการสินค้าในการสั่งซื้อ |
-
-**ความสัมพันธ์**
-
-`products.product_id`  
-↓  
-`order_items.product_id`
+| หัวข้อ (Metrics) | ผลการดำเนินงาน (Results) |
+| :--- | :--- |
+| **แหล่งข้อมูล (Source)** | Google Drive |
+| **รูปแบบข้อมูล (Format)** | CSV Files |
+| **จำนวนตารางต้นทาง** | 12 ตาราง |
+| **จำนวน Records รวม** | 1,631,380 Records |
+| **จำนวน Columns รวม** | 39 Columns |
+| **Extract Tool** | Python + Pandas |
+| **Database Engine** | DuckDB |
+| **Load Layer** | Raw / Staging |
+| **จำนวน Staging Tables** | 12 Tables (`stg_*`) |
+| **Transform Tool** | SQL + DuckDB |
+| **Data Cleaning** | ตรวจสอบ Missing Values, Duplicates และ Integrity Keys |
+| **Data Type Management** | ตรวจสอบและแปลง Data Type ให้เหมาะสมกับการใช้งาน |
+| **Dimension Tables** | `Customer`, `Product`, `Store`, `Category`, `Supplier`, `Promotion`, `Employee` (7 Tables) |
+| **Fact Tables** | `Orders`, `Order Items`, `Payments`, `Shipments`, `Returns` (5 Tables) |
+| **Key Calculation** | `sales_amount = qty * price` |
+| **Output Final** | Data Warehouse (Star Schema) พร้อมสำหรับการวิเคราะห์เชิงธุรกิจ |
 
 ---
 
-### 8.4 Products และ Categories
+### **ข้อสรุปสำคัญ (Key Takeaways)**
 
-| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
-|:---|:---:|:---|:---:|:---|
-| `categories` | `category_id` | `products` | `category_id` | `category_id` ใช้ระบุว่าสินค้าแต่ละรายการอยู่ในหมวดหมู่ใด |
-
-**ความสัมพันธ์**
-
-`categories.category_id`  
-↓  
-`products.category_id`
-
----
-
-### 8.5 Products และ Suppliers
-
-| ตารางต้นทาง | Primary Key | ตารางปลายทาง | Foreign Key | รายละเอียด |
-|:---|:---:|:---|:---:|:---|
-| `suppliers` | `supplier_id` | `products` | `supplier_id` | `supplier_id` ใช้ระบุว่าสินค้าได้รับการจัดหาจากผู้จัดจำหน่ายรายใด |
-
-**ความสัมพันธ์**
-
-`suppliers.supplier_id`  
-↓  
-`products.supplier_id`
-
-9. การ Transform ข้อมูลวันที่
-
-จากการตรวจสอบ Data Type พบว่า Column วันที่บางรายการถูกจัดเก็บในรูปแบบข้อความ เช่น
-
-`customers.signup_date`
-`orders.order_date`
-
-เพื่อให้เหมาะสมกับการวิเคราะห์ข้อมูลตามช่วงเวลา จึงสามารถ Transform ข้อมูลดังกล่าวให้อยู่ในรูปแบบวันที่ เช่น datetime
-
-การแปลงข้อมูลวันที่ช่วยให้สามารถวิเคราะห์ข้อมูลเพิ่มเติมได้ เช่น
-
-จำนวนลูกค้าที่สมัครในแต่ละเดือน,
-จำนวนคำสั่งซื้อรายวัน,
-จำนวนคำสั่งซื้อรายเดือน,
-แนวโน้มการสั่งซื้อในแต่ละช่วงเวลา,
-
-10. การคำนวณข้อมูลสำหรับการวิเคราะห์
-
-ในตาราง order_items มีข้อมูล qty และ price ซึ่งสามารถนำมาคำนวณมูลค่าการขายของแต่ละรายการได้ โดยกำหนดสูตรดังนี้
-
-`Sales Amount = Quantity × Price`
-
-หรือ
-
-`sales_amount = qty × price`
-
-การสร้าง Column ดังกล่าวถือเป็นการ Transform เนื่องจากเป็นการสร้างข้อมูลใหม่จากข้อมูลเดิมเพื่อเตรียมความพร้อมสำหรับการวิเคราะห์ยอดขาย
-
-11. การรวมข้อมูลหลายตาราง
-
-หลังจากตรวจสอบและทำความสะอาดข้อมูลแล้ว สามารถนำข้อมูลจากหลายตารางมาเชื่อมโยงกันเพื่อสร้างชุดข้อมูลสำหรับการวิเคราะห์
-
-ตัวอย่างเช่น การเชื่อมโยง
-
-`orders + order_items + products + categories`
-
-เพื่อให้สามารถวิเคราะห์ข้อมูลได้ในระดับคำสั่งซื้อ รายการสินค้า สินค้า และหมวดหมู่สินค้าในชุดข้อมูลเดียวกัน
-
-กระบวนการดังกล่าวช่วยลดความซับซ้อนในการวิเคราะห์ และทำให้สามารถนำข้อมูลไปสร้างรายงานหรือวิเคราะห์ยอดขายได้สะดวกยิ่งขึ้น
-
-12. ผลการตรวจสอบคุณภาพข้อมูล
-
-จากการดำเนินงาน ELT และตรวจสอบ Dataset ใน Google Colab สามารถสรุปผลการตรวจสอบเบื้องต้นได้ดังนี้
-
-## 13. สรุปการดำเนินงาน ELT
-
-การดำเนินงาน ELT (Extract, Load, Transform) ได้ดำเนินการเพื่อเตรียมข้อมูลจากฐานข้อมูลต้นทางให้มีความพร้อมสำหรับการวิเคราะห์และการจัดทำ Data Warehouse โดยเริ่มจากการ Extract ข้อมูลจากตารางต้นทางทั้งหมด 12 ตาราง จากนั้น Load ข้อมูลเข้าสู่ระบบฐานข้อมูล และดำเนินการ Transform ข้อมูลภายในระบบปลายทาง เพื่อให้ข้อมูลมีความถูกต้อง สอดคล้อง และพร้อมสำหรับการนำไปวิเคราะห์
-
-### รายการตรวจสอบข้อมูลหลังดำเนินการ ELT
-
-| รายการตรวจสอบ | ผลการตรวจสอบ |
-|:---|---|
-| จำนวนตารางหลัก | 12 ตาราง |
-| จำนวน Records รวม | 1,631,380 Records |
-| จำนวน Columns รวม | 39 Columns |
-| Missing Value | ไม่พบ |
-| Duplicate Records | ไม่พบ |
-| Data Type | ตรวจสอบแล้ว |
-| Primary Key | ตรวจสอบแยกตามตาราง |
-| ความสัมพันธ์ระหว่างตาราง | ตรวจสอบ Foreign Key |
-| ข้อมูลวันที่ | ตรวจสอบและเตรียมสำหรับ Transform |
-| ข้อมูลสำหรับวิเคราะห์ | สร้างจากการเชื่อมโยงหลายตาราง |
+กระบวนการ ELT ที่พัฒนาขึ้นสามารถดึงและโหลดข้อมูลระบบค้าปลีกจากไฟล์ CSV จำนวน 12 ตาราง เข้าสู่ DuckDB ผ่าน **Staging Layer** ได้อย่างมีประสิทธิภาพ จากนั้นได้ดำเนินการทำความสะอาดและแปลงสภาพข้อมูล (Data Transformation) ทั้งการจัดการค่าว่าง, รายการซ้ำ, การตรวจสอบความสัมพันธ์ของ Key และ Data Types ก่อนจัดโครงสร้างออกเป็น **Dimension และ Fact Tables** ตามสถาปัตยกรรม Data Warehouse ซึ่งช่วยให้ข้อมูลมีความถูกต้อง สมบูรณ์ และพร้อมนำไปใช้ในการวิเคราะห์ข้อมูลเชิงลึก (Business Intelligence & Data Analytics) ต่อไป
 
 
-จากการดำเนินงานสามารถสรุปกระบวนการ ELT ของโครงงานได้เป็น 3 ขั้นตอนหลัก ได้แก่ Extract, Load และ Transform
-
-ในขั้นตอน Extract ได้ทำการดึง Dataset จาก Google Drive เข้าสู่ Google Colab โดยใช้ Python และ Pandas จากนั้นตรวจสอบไฟล์และโครงสร้างข้อมูล พบ Dataset หลักจำนวน 12 ตาราง รวม 1,631,380 Records และ 39 Columns
-
-ในขั้นตอน Load ได้นำข้อมูลที่ดึงมาจากแหล่งต้นทางเข้าสู่ระบบฐานข้อมูลปลายทาง โดยรักษาข้อมูลต้นฉบับไว้ก่อนทำการเปลี่ยนแปลง เพื่อให้สามารถตรวจสอบและย้อนกลับไปยังข้อมูลต้นทางได้
-
-ในขั้นตอน Transform ได้ดำเนินการตรวจสอบและปรับปรุงข้อมูล ได้แก่ การตรวจสอบ Column และ Data Type การตรวจสอบ Missing Value การตรวจสอบ Duplicate Records การตรวจสอบ Primary Key การตรวจสอบความสัมพันธ์ระหว่างตาราง และการแปลงข้อมูลวันที่ให้เหมาะสมกับการวิเคราะห์ นอกจากนี้ยังสามารถสร้างข้อมูลใหม่ เช่น sales_amount จาก qty × price และเชื่อมโยงข้อมูลจากหลายตารางเพื่อสร้างชุดข้อมูลสำหรับการวิเคราะห์
-
-จากการตรวจสอบเบื้องต้นพบว่า Dataset หลัก ไม่พบ Missing Value และไม่พบ Duplicate Records ในระดับทั้งแถว ข้อมูลมีโครงสร้างหลายตารางที่สามารถเชื่อมโยงกันด้วย Key ต่าง ๆ เช่น` customer_id`, `order_id`, `product_id`, `category_id` และ` supplier_id` จึงมีความเหมาะสมสำหรับนำไปใช้ในขั้นตอนการวิเคราะห์ข้อมูลและการสร้างระบบรายงานต่อไป
-สรุปกระบวนการแบบสั้น
-                  
-## ELT Process
-
-| ขั้นตอน | กระบวนการ | รายละเอียด |
-|:---:|:---|:---|
-| **1** | 📂 **DATASET** | ข้อมูลต้นทาง (Dataset) |
-| ↓ | ↓ | ↓ |
-| **2** | 📥 **EXTRACT** | ดึงข้อมูลจาก **Google Drive → Google Colab** |
-| ↓ | ↓ | ↓ |
-| **3** | 💾 **LOAD** | โหลดข้อมูลเข้าสู่ **Target Database** และเก็บข้อมูลในรูปแบบ **Raw Data** |
-| ↓ | ↓ | ↓ |
-| **4** | ⚙️ **TRANSFORM** | ตรวจสอบและปรับปรุงข้อมูล ได้แก่ Data Type, Missing Value, Duplicate, Primary Key, Foreign Key, Join และ Calculate |
-| ↓ | ↓ | ↓ |
-| **5** | 📊 **OUTPUT** | ได้ข้อมูลที่ผ่านการตรวจสอบและ Transform พร้อมสำหรับการวิเคราะห์ |
-
-## Web Dashboard
-https://retail-dashboard-ha9ehzzdtvdpvt2vfbapgj.streamlit.app/
-
-
-
-
+```
+<img width="1125" height="1456" alt="lt1 1" src="https://github.com/user-attachments/assets/43f58282-3ca8-4d84-8b17-75b9f5c17eca" />
+<img width="1125" height="1456" alt="lt2" src="https://github.com/user-attachments/assets/63833c61-b31f-40c4-b99f-eca40e4b8025" />
+<img width="1125" height="1456" alt="lt3" src="https://github.com/user-attachments/assets/58e66a30-0e61-4a10-9b6b-84d7d885ed25" />
+<img width="1125" height="1456" alt="lt4" src="https://github.com/user-attachments/assets/1276d3e2-38bf-4f89-8260-43afc5a503ea" />
+<img width="1125" height="1456" alt="it5" src="https://github.com/user-attachments/assets/7a5aca64-7378-412e-bf90-439a58451b6a" />
