@@ -5,6 +5,9 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
+# --- ปลดล็อกข้อจำกัดของ Altair (ป้องกัน Error เมื่อข้อมูลเกิน 5000 บรรทัด) ---
+alt.data_transformers.disable_max_rows()
+
 # --- Page Config & Modern Styling ---
 st.set_page_config(
     page_title="Retail Enterprise Analytics Dashboard",
@@ -54,7 +57,6 @@ st.markdown("""
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
-
 def get_dataset_dir():
     candidates = [
         PROJECT_ROOT / "datasets",
@@ -72,7 +74,6 @@ def get_dataset_dir():
             if "orders.csv" in csv_files or "fact_sales.csv" in csv_files or "products.csv" in csv_files:
                 return candidate
     return None
-
 
 @st.cache_data
 def load_full_dataset():
@@ -146,7 +147,6 @@ def load_full_dataset():
     ensure_column("dim_product", "supplier_id", "INT", "0")
     ensure_column("dim_product", "price", "DOUBLE", "0.0")
 
-    # Dynamic SQL handling สำหรับคอลัมน์วันที่ใน orders
     orders_cols = get_cols("orders")
     if "date_id" in orders_cols:
         date_id_expr = "COALESCE(o.date_id, 0)"
@@ -155,12 +155,10 @@ def load_full_dataset():
     else:
         date_id_expr = "0"
 
-    # 2. กรณีไม่มี fact_sales ให้สร้างจาก orders + order_items
     if "fact_sales" not in [r[0].lower() for r in con.execute("SHOW TABLES").fetchall()]:
         if "orders" in existing_tables and "order_items" in existing_tables:
             oi_cols = get_cols("order_items")
             
-            # เช็คคอลัมน์ ID ของ order_items
             if "order_item_id" in oi_cols:
                 oi_id_sql = "oi.order_item_id"
             elif "order_items_id" in oi_cols:
@@ -168,7 +166,6 @@ def load_full_dataset():
             else:
                 oi_id_sql = "ROW_NUMBER() OVER()"
 
-            # เช็คคอลัมน์ Quantity ของ order_items (รองรับทั้ง quantity และ qty)
             if "quantity" in oi_cols:
                 oi_qty_sql = "oi.quantity"
             elif "qty" in oi_cols:
@@ -176,7 +173,6 @@ def load_full_dataset():
             else:
                 oi_qty_sql = "0"
 
-            # เช็คคอลัมน์ Unit Price ของ order_items (รองรับทั้ง unit_price และ price)
             if "unit_price" in oi_cols:
                 oi_price_sql = "oi.unit_price"
             elif "price" in oi_cols:
@@ -354,7 +350,6 @@ def load_full_dataset():
     finally:
         con.close()
 
-
 def process_dataframe(df):
     if df.empty:
         return df
@@ -380,28 +375,30 @@ def process_dataframe(df):
 
     return df
 
-
 def main():
     st.title("🛍️ Retail Enterprise Analytics Dashboard")
     st.caption("ระบบวิเคราะห์เชิงลึกข้อมูลการขาย สิทธิประโยชน์ ลูกค้า และห่วงโซ่อุปทาน (Enterprise Business Intelligence)")
 
     df, df_emp = load_full_dataset()
     if df.empty:
-        st.warning("⚠️ ไม่พบข้อมูลไฟล์ CSV ในโฟลเดอร์ที่กำหนด")
-        return
+        st.warning("⚠️ ไม่พบข้อมูลไฟล์ CSV ในโฟลเดอร์ที่กำหนด กรุณาตรวจสอบ Data Source")
+        st.stop() # หยุดการทำงานแทนการใช้ return
 
     st.sidebar.header("🔍 ตัวกรองข้อมูล (Filters)")
     min_d, max_d = df["order_date"].min().date(), df["order_date"].max().date()
 
-    date_range = st.sidebar.date_input(
-        "ช่วงวันที่", [min_d, max_d], min_value=min_d, max_value=max_d
+    # จัดการกรณีที่ผู้ใช้คลิกเลือกแค่วันเริ่มต้นวันเดียว
+    date_input = st.sidebar.date_input(
+        "ช่วงวันที่", 
+        value=(min_d, max_d),
+        min_value=min_d, 
+        max_value=max_d
     )
-    if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
-        start_d, end_d = date_range
-    elif isinstance(date_range, (list, tuple)) and len(date_range) == 1:
-        start_d = end_d = date_range[0]
+    
+    if len(date_input) == 2:
+        start_d, end_d = date_input
     else:
-        start_d = end_d = date_range
+        start_d = end_d = date_input[0]
 
     cities = st.sidebar.multiselect(
         "สาขาตามเมือง (Store City)",
@@ -422,8 +419,8 @@ def main():
     ]
 
     if df_filtered.empty:
-        st.info("ไม่มีข้อมูลตรงกับเงื่อนไขตัวกรองที่เลือก")
-        return
+        st.info("💡 ไม่มีข้อมูลตรงกับเงื่อนไขตัวกรองที่เลือก กรุณาปรับช่วงเวลาหรือตัวกรองอื่นๆ")
+        st.stop() # หยุดการทำงานแทนการใช้ return
 
     df_emp_filtered = df_emp[df_emp["store_city"].isin(cities)] if not df_emp.empty else pd.DataFrame()
 
@@ -468,8 +465,11 @@ def main():
         
         monthly_df["aov"] = monthly_df.apply(lambda x: x["revenue"] / x["orders"] if x["orders"] > 0 else 0, axis=1)
         monthly_df["prev_revenue"] = monthly_df["revenue"].shift(1)
+        
+        # ปรับปรุง Logic การคำนวณ Growth ป้องกัน NaN และ Infinity
         monthly_df["mom_growth_%"] = monthly_df.apply(
-            lambda x: ((x["revenue"] - x["prev_revenue"]) / x["prev_revenue"] * 100) if pd.notnull(x["prev_revenue"]) and x["prev_revenue"] > 0 else 0,
+            lambda x: ((x["revenue"] - x["prev_revenue"]) / x["prev_revenue"] * 100) 
+            if pd.notna(x["prev_revenue"]) and x["prev_revenue"] > 0 else 0.0,
             axis=1
         )
 
@@ -588,7 +588,6 @@ def main():
                 ).properties(height=300),
                 use_container_width=True
             )
-
     with t3:
         st.header("🎟️ การวิเคราะห์ผลกระทบของโปรโมชันและการชำระเงิน")
 
@@ -698,7 +697,7 @@ def main():
                 y=alt.Y("supplier_name:N", sort="-x", title="ชื่อ Supplier"),
                 tooltip=["supplier_name", "supplier_country", alt.Tooltip("total_revenue:Q", format="$,.2f")]
             ).properties(height=300),
-                use_container_width=True
+            use_container_width=True
         )
 
         if not df_emp_filtered.empty:
@@ -839,7 +838,6 @@ def main():
                 ).properties(height=300),
                 use_container_width=True
             )
-
 
 if __name__ == "__main__":
     main()
