@@ -1474,6 +1474,6 @@ CUSTOMER ───────► FACT_SHIPMENTS ◄────── STORE
 
 โดยรวมแล้ว กระบวนการ ELT สามารถสรุปได้เป็นลำดับ **Source CSV → Extract ด้วย Python/Pandas → Load เข้าสู่ DuckDB Staging → Data Cleaning และ Data Validation → Transform ด้วย SQL/DuckDB → Dimension และ Fact Tables → Multidimensional Data Warehouse** ซึ่งช่วยให้ข้อมูลมีความเป็นระบบ มีความถูกต้อง และพร้อมสำหรับการนำไปวิเคราะห์และสร้างรายงานเชิงธุรกิจต่อไป กระบวนการโดยรวมสอดคล้องกับแนวทาง ELT ของโปรเจกต์ที่ใช้ Source CSV, DuckDB Staging, Data Cleaning, Validation และ SQL Transformation ก่อนสร้าง Data Warehouse
 # Dashborad Link
-##อ้างอิง
+## อ้างอิง
 Datarspectrum Technology Training Center. (n.d.). Retail Data Warehouse – 12 Table 1M+ Rows Dataset [Data set]. Kaggle.
 https://www.kaggle.com/datasets/datarspectrum/retail-data-warehouse-12-table-1m-rows-dataset
