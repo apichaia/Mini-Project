@@ -652,10 +652,11 @@ DATA ANALYSIS
 
 ```
 
-<img width="562" height="735" alt="Screenshot 2026-09-09 201155" src="https://github.com/user-attachments/assets/46674f76-ca52-4ba8-a20d-409cbeecf17d" />
-<img width="567" height="732" alt="Screenshot 2026-09-09 201143" src="https://github.com/user-attachments/assets/3ac593ee-3b8f-4ce7-a78d-6b64b3139a37" />
-<img width="560" height="732" alt="Screenshot 2026-09-09 201127" src="https://github.com/user-attachments/assets/c1d20f03-0296-4952-9c50-151bb8fbd8e5" />
-<img width="568" height="737" alt="Screenshot 2026-09-09 201115" src="https://github.com/user-attachments/assets/74a3bd7b-780c-4af8-9b4e-175266ad0c74" />
-<img width="565" height="731" alt="Screenshot 2026-09-09 201107" src="https://github.com/user-attachments/assets/2931599a-096b-4675-9847-a53546001d8f" />
+<img width="1125" height="1456" alt="it5" src="https://github.com/user-attachments/assets/7a5aca64-7378-412e-bf90-439a58451b6a" />
+<img width="1125" height="1456" alt="lt4" src="https://github.com/user-attachments/assets/1276d3e2-38bf-4f89-8260-43afc5a503ea" />
+<img width="1125" height="1456" alt="lt3" src="https://github.com/user-attachments/assets/58e66a30-0e61-4a10-9b6b-84d7d885ed25" />
+<img width="1125" height="1456" alt="lt2" src="https://github.com/user-attachments/assets/63833c61-b31f-40c4-b99f-eca40e4b8025" />
+<img width="1125" height="1456" alt="lt1" src="https://github.com/user-attachments/assets/98fcc67a-ee45-4ef6-9fdf-2f925b137268" />
+
 
 
