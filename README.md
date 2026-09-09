@@ -303,8 +303,10 @@ Dataset ที่ใช้ในโครงงานเป็นข้อมู
 <1,631,380 Records และ 39 Columns>
 
 
+# ๒Retail Data Warehouse — End-to-End ELT Pipeline with DuckDB
 
-## 1.3 การเตรียมสภาพแวดล้อม (Environment Setup)
+> **Project Documentation | Extract → Load → Transform Architecture**  
+> *เอกสารสรุปการพัฒนาระบบ คลังข้อมูลสินค้าปลีก ด้วย Python, Pandas และ DuckDB*
 
 การดำเนินงานใช้ **Google Colab** ร่วมกับ **DuckDB** และ **Pandas**
 
@@ -646,4 +648,14 @@ DATA ANALYSIS
 ### **ข้อสรุปสำคัญ (Key Takeaways)**
 
 กระบวนการ ELT ที่พัฒนาขึ้นสามารถดึงและโหลดข้อมูลระบบค้าปลีกจากไฟล์ CSV จำนวน 12 ตาราง เข้าสู่ DuckDB ผ่าน **Staging Layer** ได้อย่างมีประสิทธิภาพ จากนั้นได้ดำเนินการทำความสะอาดและแปลงสภาพข้อมูล (Data Transformation) ทั้งการจัดการค่าว่าง, รายการซ้ำ, การตรวจสอบความสัมพันธ์ของ Key และ Data Types ก่อนจัดโครงสร้างออกเป็น **Dimension และ Fact Tables** ตามสถาปัตยกรรม Data Warehouse ซึ่งช่วยให้ข้อมูลมีความถูกต้อง สมบูรณ์ และพร้อมนำไปใช้ในการวิเคราะห์ข้อมูลเชิงลึก (Business Intelligence & Data Analytics) ต่อไป
+
+
+```
+
+<img width="562" height="735" alt="Screenshot 2026-09-09 201155" src="https://github.com/user-attachments/assets/46674f76-ca52-4ba8-a20d-409cbeecf17d" />
+<img width="567" height="732" alt="Screenshot 2026-09-09 201143" src="https://github.com/user-attachments/assets/3ac593ee-3b8f-4ce7-a78d-6b64b3139a37" />
+<img width="560" height="732" alt="Screenshot 2026-09-09 201127" src="https://github.com/user-attachments/assets/c1d20f03-0296-4952-9c50-151bb8fbd8e5" />
+<img width="568" height="737" alt="Screenshot 2026-09-09 201115" src="https://github.com/user-attachments/assets/74a3bd7b-780c-4af8-9b4e-175266ad0c74" />
+<img width="565" height="731" alt="Screenshot 2026-09-09 201107" src="https://github.com/user-attachments/assets/2931599a-096b-4675-9847-a53546001d8f" />
+
 
