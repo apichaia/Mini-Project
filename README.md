@@ -188,7 +188,8 @@ order_item_id เชื่อมโยงรายการสินค้าเ
 <img src="./readme_images/Business Q1.jpg">
 <img src="./readme_images/KPI1.jpg">
 <img src="./readme_images/KPI2.jpg">
-## 4. Business Process and Multidimensional Data Model
+
+## 4.Business Process and Multidimensional Data Model
 
 ### 4.1 Business Process
 
