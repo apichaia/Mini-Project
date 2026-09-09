@@ -30,7 +30,7 @@ DB_PATH = PROJECT_ROOT / "dev.duckdb"
 # =========================================================
 
 # -------------------------
-# Staging Tables (12)
+# Staging Tables 
 # -------------------------
 
 STAGING_TABLES = [
@@ -50,7 +50,7 @@ STAGING_TABLES = [
 
 
 # -------------------------
-# Dimension Tables (7)
+# Dimension Tables 
 # -------------------------
 
 DIMENSION_TABLES = [
@@ -65,7 +65,7 @@ DIMENSION_TABLES = [
 
 
 # -------------------------
-# Fact Tables (4)
+# Fact Tables 
 # -------------------------
 
 FACT_TABLES = [
@@ -320,13 +320,22 @@ st.markdown(
 )
 
 
+st.markdown("""
+<style>
+.main-title {
+    color:  #FF69B4;
+    font-size: 40px;
+    font-weight: 700;
+}
+</style>
+""", unsafe_allow_html=True)
+
 st.markdown(
     '<div class="main-title">'
     '📊 retail_data'
     '</div>',
     unsafe_allow_html=True
 )
-
 
 st.markdown(
     '<div class="subtitle">'
@@ -421,29 +430,17 @@ st.sidebar.markdown(
 )
 
 
-st.sidebar.markdown(
-    f"**Fact Tables:** "
-    f"{len(available_fact)} / 4"
-)
-
-
-st.sidebar.markdown(
-    f"**Total Tables:** "
-    f"{len(all_tables)} / 23"
-)
-
-
 if not stats_df.empty:
 
-    total_rows = stats_df[
-        "row_count"
-    ].sum()
+    total_rows = pd.to_numeric(
+        stats_df["row_count"],
+        errors="coerce"
+    ).fillna(0).sum()
 
     st.sidebar.markdown(
         f"**Total Rows:** "
-        f"{total_rows:,}"
+        f"{int(total_rows):,}"
     )
-
 
 # =========================================================
 # Main Tabs
