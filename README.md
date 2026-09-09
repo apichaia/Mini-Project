@@ -42,7 +42,7 @@ For Datawarehouse
 | 10 | `orders` | 300,000 | 5 | ข้อมูลคำสั่งซื้อ |
 | 11 | `order_items` | 600,000 | 5 | รายละเอียดสินค้าในคำสั่งซื้อ |
 | 12 | `shipments` | 300,000 | 3 | ข้อมูลการจัดส่ง |
-Dataset หลักทั้ง 12 ตารางมีข้อมูลรวมทั้งหมด 1,631,380 Records และ 39 Columns
+Dataset หลักทั้ง 12 ตารางมีข้อมูลรวมทั้งหมด 1,591,380 Records และ 39 Columns
 
 https://colab.research.google.com/drive/1cb03m3na2yEKvnH9-JK1oxXGFHjB0PGo#scrollTo=b8417809
 
@@ -50,7 +50,7 @@ https://colab.research.google.com/drive/1cb03m3na2yEKvnH9-JK1oxXGFHjB0PGo#scroll
 
 OLTP (Online Transaction Processing) หรือ ระบบประมวลผลรายการธุรกรรมออนไลน์ เป็นระบบฐานข้อมูลที่ใช้สำหรับจัดเก็บและประมวลผลธุรกรรมที่เกิดขึ้นจากการดำเนินงานประจำวันขององค์กร โดยมีจุดมุ่งหมายเพื่อให้สามารถบันทึก แก้ไข และเรียกใช้ข้อมูลธุรกรรมได้อย่างรวดเร็ว ถูกต้อง และเป็นระบบ รวมถึงสามารถรองรับธุรกรรมจำนวนมากและการทำงานของผู้ใช้งานหลายคนพร้อมกัน
 
-สำหรับ Dataset ที่นำมาใช้ในโครงงานนี้ มีลักษณะเป็นข้อมูลของ ระบบธุรกิจค้าปลีก (Retail Business) ซึ่งประกอบด้วยข้อมูลลูกค้า สินค้า ร้านค้า พนักงาน ผู้จัดจำหน่าย ประเภทสินค้า โปรโมชั่น ตลอดจนข้อมูลการสั่งซื้อ การชำระเงิน การจัดส่ง และการคืนสินค้า โดย Dataset หลักประกอบด้วย 12 ตาราง จำนวนรวม 1,631,380 Records และ 39 Columns
+สำหรับ Dataset ที่นำมาใช้ในโครงงานนี้ มีลักษณะเป็นข้อมูลของ ระบบธุรกิจค้าปลีก (Retail Business) ซึ่งประกอบด้วยข้อมูลลูกค้า สินค้า ร้านค้า พนักงาน ผู้จัดจำหน่าย ประเภทสินค้า โปรโมชั่น ตลอดจนข้อมูลการสั่งซื้อ การชำระเงิน การจัดส่ง และการคืนสินค้า โดย Dataset หลักประกอบด้วย 12 ตาราง จำนวนรวม 1,591,380 Records และ 39 Columns
 
 จากการศึกษาลักษณะและโครงสร้างของข้อมูล พบว่า Dataset มีความสอดคล้องกับระบบ OLTP เนื่องจากมีทั้ง ข้อมูลหลัก (Master Data) และ ข้อมูลธุรกรรม (Transaction Data) ซึ่งทำงานเชื่อมโยงกันเพื่อรองรับกระบวนการขายสินค้า
 
@@ -651,7 +651,7 @@ DATA ANALYSIS
 
 
 ```
-<img width="1125" height="1456" alt="lt1" src="https://github.com/user-attachments/assets/98fcc67a-ee45-4ef6-9fdf-2f925b137268" />
+<img width="1125" height="1456" alt="lt1 1" src="https://github.com/user-attachments/assets/43f58282-3ca8-4d84-8b17-75b9f5c17eca" />
 <img width="1125" height="1456" alt="lt2" src="https://github.com/user-attachments/assets/63833c61-b31f-40c4-b99f-eca40e4b8025" />
 <img width="1125" height="1456" alt="lt3" src="https://github.com/user-attachments/assets/58e66a30-0e61-4a10-9b6b-84d7d885ed25" />
 <img width="1125" height="1456" alt="lt4" src="https://github.com/user-attachments/assets/1276d3e2-38bf-4f89-8260-43afc5a503ea" />
