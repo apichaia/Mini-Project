@@ -5,6 +5,9 @@ import pandas as pd
 import streamlit as st
 import altair as alt
 
+# --- ปลดล็อกข้อจำกัดของ Altair (ป้องกัน Error เมื่อข้อมูลเกิน 5000 บรรทัด) ---
+alt.data_transformers.disable_max_rows()
+
 # --- Page Config & Modern Styling ---
 st.set_page_config(
     page_title="Retail Enterprise Analytics Dashboard",
@@ -53,22 +56,24 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 PROJECT_ROOT = Path(__file__).resolve().parent
-WEEKDAY_ORDER = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
-
 
 def get_dataset_dir():
     candidates = [
-        PROJECT_ROOT / "retail_data" / "datasets",
         PROJECT_ROOT / "datasets",
+        PROJECT_ROOT / "retail_data" / "datasets",
         PROJECT_ROOT,
+        PROJECT_ROOT.parent / "datasets",
+        PROJECT_ROOT.parent / "retail_data" / "datasets",
         Path.cwd() / "datasets",
+        Path.cwd() / "retail_data" / "datasets",
         Path.cwd(),
     ]
     for candidate in candidates:
-        if candidate.exists() and (candidate / "orders.csv").exists():
-            return candidate
+        if candidate.exists():
+            csv_files = [f.name for f in candidate.glob("*.csv")]
+            if "orders.csv" in csv_files or "fact_sales.csv" in csv_files or "products.csv" in csv_files:
+                return candidate
     return None
-
 
 @st.cache_data
 def load_full_dataset():
@@ -78,148 +83,250 @@ def load_full_dataset():
 
     con = duckdb.connect(":memory:")
 
-    tables_def = [
-        ("orders.csv", "orders", "SELECT NULL::INT AS order_id, NULL::DATE AS order_date, NULL::INT AS customer_id, NULL::INT AS store_id, NULL::INT AS promotion_id WHERE 1=0"),
-        ("order_items.csv", "order_items", "SELECT NULL::INT AS order_item_id, NULL::INT AS order_id, NULL::INT AS product_id, 0 AS qty, 0.0 AS price WHERE 1=0"),
-        ("products.csv", "products", "SELECT NULL::INT AS product_id, 'Product ' || product_id AS product_name, NULL::INT AS category_id, NULL::INT AS supplier_id, 0.0 AS price WHERE 1=0"),
-        ("categories.csv", "categories", "SELECT NULL::INT AS category_id, 'Uncategorized' AS category_name WHERE 1=0"),
-        ("suppliers.csv", "suppliers", "SELECT NULL::INT AS supplier_id, 'Supplier ' || supplier_id AS supplier_name, 'Unknown Country' AS country WHERE 1=0"),
-        ("customers.csv", "customers", "SELECT NULL::INT AS customer_id, 'Customer ' || customer_id AS customer_name, 'Unknown Customer City' AS city, NULL::DATE AS signup_date WHERE 1=0"),
-        ("stores.csv", "stores", "SELECT NULL::INT AS store_id, 'Store ' || store_id AS store_name, 'Unknown Store City' AS city WHERE 1=0"),
-        ("promotions.csv", "promotions", "SELECT NULL::INT AS promotion_id, 'Promo ' || promotion_id AS promotion_name, 0.0 AS discount WHERE 1=0"),
-        ("returns.csv", "returns", "SELECT NULL::INT AS order_item_id, 0.0 AS refund WHERE 1=0"),
-        ("shipments.csv", "shipments", "SELECT NULL::INT AS order_id, 'Pending' AS status, NULL::DATE AS delivery_date, NULL::DATE AS estimated_delivery_date WHERE 1=0"),
-        ("payments.csv", "payments", "SELECT NULL::INT AS order_id, 0.0 AS amount WHERE 1=0"),
-        ("employees.csv", "employees", "SELECT NULL::INT AS employee_id, NULL::INT AS store_id, 0.0 AS salary WHERE 1=0")
-    ]
+    # 1. โหลดไฟล์ CSV ทั้งหมดเข้า DuckDB
+    for fpath in dataset_dir.glob("*.csv"):
+        tname = fpath.stem.lower()
+        p_str = str(fpath).replace("\\", "/")
+        con.execute(f"CREATE TABLE IF NOT EXISTS {tname} AS SELECT * FROM read_csv_auto('{p_str}')")
 
-    for fname, tname, fallback_sql in tables_def:
-        fpath = dataset_dir / fname
-        if fpath.exists():
-            p_str = str(fpath).replace("\\", "/")
-            con.execute(f"CREATE TABLE {tname} AS SELECT * FROM read_csv_auto('{p_str}')")
-        else:
-            con.execute(f"CREATE TABLE {tname} AS {fallback_sql}")
-
-    def ensure_column(table, col, col_type, default_val="NULL"):
-        cols = [r[1].lower() for r in con.execute(f"PRAGMA table_info('{table}')").fetchall()]
-        if col.lower() not in cols:
-            con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type} DEFAULT {default_val}")
-
-    ensure_column("shipments", "status", "VARCHAR", "'Pending'")
-    ensure_column("shipments", "delivery_date", "DATE", "NULL")
-    ensure_column("shipments", "estimated_delivery_date", "DATE", "NULL")
-    ensure_column("products", "product_name", "VARCHAR", "NULL")
-    ensure_column("products", "category_id", "INT", "NULL")
-    ensure_column("products", "supplier_id", "INT", "NULL")
-    ensure_column("suppliers", "supplier_name", "VARCHAR", "NULL")
-    ensure_column("suppliers", "country", "VARCHAR", "'Unknown Country'")
-    ensure_column("stores", "store_name", "VARCHAR", "NULL")
-    ensure_column("stores", "city", "VARCHAR", "'Unknown Store City'")
-    ensure_column("customers", "customer_name", "VARCHAR", "NULL")
-    ensure_column("customers", "city", "VARCHAR", "'Unknown Customer City'")
-    ensure_column("customers", "signup_date", "DATE", "NULL")
-    ensure_column("categories", "category_name", "VARCHAR", "'Uncategorized'")
-    ensure_column("promotions", "promotion_name", "VARCHAR", "NULL")
-    ensure_column("promotions", "discount", "DOUBLE", "0.0")
+    existing_tables = [r[0].lower() for r in con.execute("SHOW TABLES").fetchall()]
 
     def get_cols(tname):
-        return [r[1].lower() for r in con.execute(f"PRAGMA table_info('{tname}')").fetchall()]
+        if tname in [r[0].lower() for r in con.execute("SHOW TABLES").fetchall()]:
+            return [r[1].lower() for r in con.execute(f"PRAGMA table_info('{tname}')").fetchall()]
+        return []
 
-    prod_cols = get_cols("products")
-    prod_name_sql = "prod.product_name" if "product_name" in prod_cols else ("prod.name" if "name" in prod_cols else "'Product #' || CAST(COALESCE(oi.product_id, 0) AS VARCHAR)")
+    def map_table(target_name, candidate_names):
+        if target_name in existing_tables:
+            return
+        for cand in candidate_names:
+            if cand in existing_tables:
+                con.execute(f"CREATE TABLE {target_name} AS SELECT * FROM {cand}")
+                existing_tables.append(target_name)
+                return
 
-    sup_cols = get_cols("suppliers")
-    sup_name_sql = "sup.supplier_name" if "supplier_name" in sup_cols else ("sup.name" if "name" in sup_cols else "'Supplier #' || CAST(COALESCE(prod.supplier_id, 0) AS VARCHAR)")
-    sup_country_sql = "sup.country" if "country" in sup_cols else "'Unknown Country'"
+    map_table("dim_customer", ["customers", "customer"])
+    map_table("dim_store", ["stores", "store"])
+    map_table("dim_product", ["products", "product"])
+    map_table("dim_promotion", ["promotions", "promotion"])
+    map_table("dim_supplier", ["suppliers", "supplier"])
+    map_table("dim_category", ["categories", "category"])
+    map_table("fact_return", ["returns", "return", "fact_returns"])
+    map_table("fact_payments", ["payments", "payment"])
+    map_table("fact_shipments", ["shipments", "shipment"])
+    map_table("employees", ["dim_employee", "employee"])
 
-    store_cols = get_cols("stores")
-    store_name_sql = "st.store_name" if "store_name" in store_cols else ("st.name" if "name" in store_cols else "'Store #' || CAST(COALESCE(o.store_id, 0) AS VARCHAR)")
-    store_city_sql = "st.city" if "city" in store_cols else "'Unknown Store City'"
+    def ensure_table(tname, columns_def):
+        if tname not in [r[0].lower() for r in con.execute("SHOW TABLES").fetchall()]:
+            con.execute(f"CREATE TABLE {tname} ({columns_def})")
 
-    promo_cols = get_cols("promotions")
-    promo_name_sql = "promotion_name" if "promotion_name" in promo_cols else ("name" if "name" in promo_cols else "CASE WHEN promotion_id IS NULL OR promotion_id = 0 THEN 'No Promotion' ELSE 'Promo #' || CAST(promotion_id AS VARCHAR) END")
+    ensure_table("orders", "order_id INT, order_date DATE, date_id INT, customer_id INT, store_id INT, promotion_id INT")
+    ensure_table("dim_date", "date_id INT, year INT, month INT, day INT")
+    ensure_table("dim_product", "product_id INT, category_id INT, supplier_id INT, price DOUBLE, product_name VARCHAR")
+    ensure_table("dim_category", "category_id INT, category_name VARCHAR")
+    ensure_table("dim_supplier", "supplier_id INT, supplier_name VARCHAR, country VARCHAR")
+    ensure_table("dim_store", "store_id INT, store_name VARCHAR, city VARCHAR")
+    ensure_table("dim_customer", "customer_id INT, customer_name VARCHAR, city VARCHAR, signup_date DATE")
+    ensure_table("dim_promotion", "promotion_id INT, promotion_name VARCHAR, discount DOUBLE")
+    ensure_table("fact_return", "order_items_id INT, refund DOUBLE")
+    ensure_table("fact_shipments", "order_id INT, status VARCHAR")
+    ensure_table("fact_payments", "order_id INT, amount DOUBLE")
+    ensure_table("employees", "employee_id INT, store_id INT, salary DOUBLE")
 
-    cust_cols = get_cols("customers")
-    cust_name_sql = "cust.customer_name" if "customer_name" in cust_cols else ("cust.name" if "name" in cust_cols else "'Customer #' || CAST(COALESCE(o.customer_id, 0) AS VARCHAR)")
-    cust_city_sql = "cust.city" if "city" in cust_cols else "'Unknown Customer City'"
-    cust_signup_sql = "cust.signup_date" if "signup_date" in cust_cols else "NULL::DATE"
+    def ensure_column(table, col, col_type, default_val="NULL"):
+        if table in [r[0].lower() for r in con.execute("SHOW TABLES").fetchall()]:
+            cols = [r[1].lower() for r in con.execute(f"PRAGMA table_info('{table}')").fetchall()]
+            if col.lower() not in cols:
+                con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type} DEFAULT {default_val}")
 
-    cat_cols = get_cols("categories")
-    cat_name_sql = "c.category_name" if "category_name" in cat_cols else ("c.name" if "name" in cat_cols else "'Uncategorized'")
+    ensure_column("orders", "date_id", "INT", "0")
+    ensure_column("orders", "promotion_id", "INT", "0")
+    ensure_column("orders", "customer_id", "INT", "0")
+    ensure_column("orders", "store_id", "INT", "0")
+    ensure_column("orders", "order_date", "DATE", "NULL")
+    ensure_column("dim_product", "supplier_id", "INT", "0")
+    ensure_column("dim_product", "price", "DOUBLE", "0.0")
+
+    orders_cols = get_cols("orders")
+    if "date_id" in orders_cols:
+        date_id_expr = "COALESCE(o.date_id, 0)"
+    elif "order_date" in orders_cols:
+        date_id_expr = "COALESCE(TRY_CAST(strftime(TRY_CAST(o.order_date AS DATE), '%Y%m%d') AS INT), 0)"
+    else:
+        date_id_expr = "0"
+
+    if "fact_sales" not in [r[0].lower() for r in con.execute("SHOW TABLES").fetchall()]:
+        if "orders" in existing_tables and "order_items" in existing_tables:
+            oi_cols = get_cols("order_items")
+            
+            if "order_item_id" in oi_cols:
+                oi_id_sql = "oi.order_item_id"
+            elif "order_items_id" in oi_cols:
+                oi_id_sql = "oi.order_items_id"
+            else:
+                oi_id_sql = "ROW_NUMBER() OVER()"
+
+            if "quantity" in oi_cols:
+                oi_qty_sql = "oi.quantity"
+            elif "qty" in oi_cols:
+                oi_qty_sql = "oi.qty"
+            else:
+                oi_qty_sql = "0"
+
+            if "unit_price" in oi_cols:
+                oi_price_sql = "oi.unit_price"
+            elif "price" in oi_cols:
+                oi_price_sql = "oi.price"
+            else:
+                oi_price_sql = "p.price"
+
+            con.execute(f"""
+                CREATE TABLE fact_sales AS
+                SELECT 
+                    {oi_id_sql} AS order_items_id,
+                    o.order_id,
+                    {date_id_expr} AS date_id,
+                    oi.product_id,
+                    o.customer_id,
+                    o.store_id,
+                    COALESCE(o.promotion_id, 0) AS promotion_id,
+                    COALESCE(p.supplier_id, 0) AS supplier_id,
+                    COALESCE({oi_qty_sql}, 0) AS quantity,
+                    COALESCE({oi_price_sql}, p.price, 0.0) AS unit_price,
+                    COALESCE({oi_qty_sql}, 0) * COALESCE({oi_price_sql}, p.price, 0.0) AS sales_amount,
+                    0.0 AS discount
+                FROM order_items oi
+                LEFT JOIN orders o ON oi.order_id = o.order_id
+                LEFT JOIN dim_product p ON oi.product_id = p.product_id
+            """)
+        else:
+            con.execute("""
+                CREATE TABLE fact_sales AS 
+                SELECT 1 AS order_items_id, 1 AS order_id, 1 AS date_id, 1 AS product_id, 
+                       1 AS customer_id, 1 AS store_id, 1 AS promotion_id, 1 AS supplier_id, 
+                       0 AS quantity, 0.0 AS unit_price, 0.0 AS sales_amount, 0.0 AS discount WHERE 1=0
+            """)
+
+    ensure_column("fact_sales", "quantity", "INT", "0")
+    ensure_column("fact_sales", "unit_price", "DOUBLE", "0.0")
+    ensure_column("fact_sales", "sales_amount", "DOUBLE", "0.0")
+    ensure_column("fact_sales", "discount", "DOUBLE", "0.0")
+    ensure_column("fact_shipments", "status", "VARCHAR", "'Pending'")
+    ensure_column("fact_return", "refund", "DOUBLE", "0.0")
+    ensure_column("fact_payments", "amount", "DOUBLE", "0.0")
+    ensure_column("dim_supplier", "country", "VARCHAR", "'Unknown Country'")
+    ensure_column("dim_store", "city", "VARCHAR", "'Unknown Store City'")
+    ensure_column("dim_customer", "city", "VARCHAR", "'Unknown Customer City'")
+    ensure_column("dim_customer", "signup_date", "DATE", "NULL")
+    ensure_column("dim_promotion", "discount", "DOUBLE", "0.0")
+    ensure_column("employees", "salary", "DOUBLE", "0.0")
+    ensure_column("employees", "store_id", "INT", "0")
+
+    prod_cols = get_cols("dim_product")
+    prod_name_sql = "dp.product_name" if "product_name" in prod_cols else ("dp.name" if "name" in prod_cols else "'Product #' || CAST(COALESCE(s.product_id, 0) AS VARCHAR)")
+    
+    cat_cols = get_cols("dim_category")
+    cat_name_sql = "dcat.category_name" if "category_name" in cat_cols else ("dcat.name" if "name" in cat_cols else ("dp.category_name" if "category_name" in prod_cols else "'Category #' || CAST(COALESCE(dp.category_id, 0) AS VARCHAR)"))
+
+    sup_cols = get_cols("dim_supplier")
+    sup_name_sql = "dsup.supplier_name" if "supplier_name" in sup_cols else ("dsup.name" if "name" in sup_cols else "'Supplier #' || CAST(COALESCE(s.supplier_id, 0) AS VARCHAR)")
+
+    store_cols = get_cols("dim_store")
+    store_name_sql = "dstr.store_name" if "store_name" in store_cols else ("dstr.name" if "name" in store_cols else "'Store #' || CAST(COALESCE(s.store_id, 0) AS VARCHAR)")
+    emp_store_name_sql = "dstr.store_name" if "store_name" in store_cols else ("dstr.name" if "name" in store_cols else "'Store #' || CAST(COALESCE(e.store_id, 0) AS VARCHAR)")
+
+    cust_cols = get_cols("dim_customer")
+    cust_name_sql = "dc.customer_name" if "customer_name" in cust_cols else ("dc.name" if "name" in cust_cols else "'Customer #' || CAST(COALESCE(s.customer_id, 0) AS VARCHAR)")
+
+    promo_cols = get_cols("dim_promotion")
+    promo_name_sql = "dpro.promotion_name" if "promotion_name" in promo_cols else ("dpro.name" if "name" in promo_cols else "CASE WHEN s.promotion_id IS NULL OR s.promotion_id = 0 THEN 'ไม่มีโปรโมชัน' ELSE 'Promo #' || CAST(s.promotion_id AS VARCHAR) END")
+
+    ret_cols = get_cols("fact_return")
+    ret_id_sql = "order_item_id" if "order_item_id" in ret_cols else ("order_items_id" if "order_items_id" in ret_cols else "order_id")
 
     try:
         query_main = f"""
-            WITH base_promos AS (
+            WITH base_sales AS (
                 SELECT 
-                    promotion_id,
-                    CASE 
-                        WHEN discount > 1 THEN discount / 100.0 
-                        ELSE COALESCE(discount, 0.0) 
-                    END AS norm_discount
-                FROM promotions
+                    fs.order_id,
+                    COALESCE(fs.order_items_id, ROW_NUMBER() OVER()) AS order_items_id,
+                    fs.date_id,
+                    fs.product_id,
+                    fs.customer_id,
+                    fs.store_id,
+                    fs.promotion_id,
+                    fs.supplier_id,
+                    COALESCE(fs.quantity, 0) AS quantity,
+                    COALESCE(fs.unit_price, 0.0) AS unit_price,
+                    COALESCE(fs.sales_amount, COALESCE(fs.quantity, 0) * COALESCE(fs.unit_price, 0.0)) AS sales_amount,
+                    COALESCE(fs.discount, 0.0) AS discount_amount
+                FROM fact_sales fs
             )
             SELECT 
-                o.order_id,
-                CAST(o.order_date AS DATE) AS order_date,
-                o.store_id,
-                o.customer_id,
-                COALESCE(o.promotion_id, 0) AS promotion_id,
-                oi.order_item_id,
-                oi.product_id,
-                COALESCE({prod_name_sql}, 'Product #' || CAST(COALESCE(oi.product_id, 0) AS VARCHAR)) AS product_name,
-                COALESCE({cat_name_sql}, 'Uncategorized') AS category_name,
-                COALESCE({sup_name_sql}, 'Supplier #' || CAST(COALESCE(prod.supplier_id, 0) AS VARCHAR)) AS supplier_name,
-                COALESCE({sup_country_sql}, 'Unknown Country') AS supplier_country,
-                COALESCE({store_name_sql}, 'Store #' || CAST(COALESCE(o.store_id, 0) AS VARCHAR)) AS store_name,
-                COALESCE({store_city_sql}, 'Unknown Store City') AS store_city,
-                COALESCE({cust_name_sql}, 'Customer #' || CAST(COALESCE(o.customer_id, 0) AS VARCHAR)) AS customer_name,
-                COALESCE({cust_city_sql}, 'Unknown Customer City') AS customer_city,
-                CAST({cust_signup_sql} AS DATE) AS customer_signup_date,
-                'Customer #' || CAST(COALESCE(o.customer_id, 0) AS VARCHAR) AS customer_label,
-                COALESCE(pro_raw_name.p_name, CASE WHEN o.promotion_id IS NULL OR o.promotion_id = 0 THEN 'ไม่มีโปรโมชัน' ELSE 'Promo #' || CAST(o.promotion_id AS VARCHAR) END) AS promotion_name,
-                COALESCE(oi.qty, 0) AS quantity,
-                COALESCE(oi.price, 0.0) AS unit_price,
-                COALESCE(pro.norm_discount, 0.0) AS discount_rate,
-                (COALESCE(oi.qty, 0) * COALESCE(oi.price, 0.0) * (1 - COALESCE(pro.norm_discount, 0.0))) AS revenue,
-                (COALESCE(oi.qty, 0) * COALESCE(oi.price, 0.0) * COALESCE(pro.norm_discount, 0.0)) AS discount_amount,
-                COALESCE(pay.total_payment, 0.0) AS total_payment,
-                COALESCE(ret.return_count, 0) > 0 AS is_returned,
-                COALESCE(ret.refund_total, 0.0) AS refund_amount,
-                COALESCE(shp.status, 'Pending') AS shipment_status,
+                s.order_id,
+                s.order_items_id AS order_item_id,
+                s.product_id,
+                s.customer_id,
+                s.store_id,
+                s.promotion_id,
+                s.supplier_id,
+                
                 CASE 
-                    WHEN shp.delivery_date IS NOT NULL AND shp.estimated_delivery_date IS NOT NULL 
-                    THEN (shp.delivery_date <= shp.estimated_delivery_date)
-                    ELSE NULL 
-                END AS is_on_time
-            FROM orders o
-            LEFT JOIN order_items oi ON o.order_id = oi.order_id
-            LEFT JOIN products prod ON oi.product_id = prod.product_id
-            LEFT JOIN categories c ON prod.category_id = c.category_id
-            LEFT JOIN suppliers sup ON prod.supplier_id = sup.supplier_id
-            LEFT JOIN customers cust ON o.customer_id = cust.customer_id
-            LEFT JOIN stores st ON o.store_id = st.store_id
-            LEFT JOIN base_promos pro ON o.promotion_id = pro.promotion_id
+                    WHEN dd.year IS NOT NULL AND dd.month IS NOT NULL AND dd.day IS NOT NULL 
+                    THEN TRY_CAST(MAKE_DATE(CAST(dd.year AS INT), CAST(dd.month AS INT), CAST(dd.day AS INT)) AS DATE)
+                    WHEN o.order_date IS NOT NULL THEN TRY_CAST(o.order_date AS DATE)
+                    ELSE CURRENT_DATE
+                END AS order_date,
+
+                s.quantity,
+                s.unit_price,
+                s.sales_amount AS revenue,
+                s.discount_amount,
+
+                COALESCE({prod_name_sql}, 'Product #' || CAST(COALESCE(s.product_id, 0) AS VARCHAR)) AS product_name,
+                COALESCE({cat_name_sql}, 'Category #' || CAST(COALESCE(dp.category_id, 0) AS VARCHAR)) AS category_name,
+                COALESCE({sup_name_sql}, 'Supplier #' || CAST(COALESCE(s.supplier_id, 0) AS VARCHAR)) AS supplier_name,
+                COALESCE(dsup.country, 'Unknown Country') AS supplier_country,
+
+                COALESCE({store_name_sql}, 'Store #' || CAST(COALESCE(s.store_id, 0) AS VARCHAR)) AS store_name,
+                COALESCE(dstr.city, 'Unknown Store City') AS store_city,
+
+                COALESCE({cust_name_sql}, 'Customer #' || CAST(COALESCE(s.customer_id, 0) AS VARCHAR)) AS customer_name,
+                COALESCE(dc.city, 'Unknown Customer City') AS customer_city,
+                CAST(dc.signup_date AS DATE) AS customer_signup_date,
+
+                COALESCE(dpro.discount, 0.0) AS discount_rate,
+                COALESCE({promo_name_sql}, 'ไม่มีโปรโมชัน') AS promotion_name,
+
+                COALESCE(ret.refund_total, 0.0) AS refund_amount,
+                COALESCE(ret.return_count, 0) > 0 AS is_returned,
+
+                COALESCE(shp.status, 'Pending') AS shipment_status,
+                COALESCE(pay.total_payment, 0.0) AS total_payment
+            FROM base_sales s
+            LEFT JOIN orders o ON s.order_id = o.order_id
+            LEFT JOIN dim_date dd ON s.date_id = dd.date_id
+            LEFT JOIN dim_product dp ON s.product_id = dp.product_id
+            LEFT JOIN dim_category dcat ON dp.category_id = dcat.category_id
+            LEFT JOIN dim_supplier dsup ON s.supplier_id = dsup.supplier_id
+            LEFT JOIN dim_store dstr ON s.store_id = dstr.store_id
+            LEFT JOIN dim_customer dc ON s.customer_id = dc.customer_id
+            LEFT JOIN dim_promotion dpro ON s.promotion_id = dpro.promotion_id
             LEFT JOIN (
-                SELECT promotion_id, {promo_name_sql} AS p_name FROM promotions
-            ) pro_raw_name ON o.promotion_id = pro_raw_name.promotion_id
+                SELECT {ret_id_sql} AS ret_item_id, COUNT(*) AS return_count, SUM(refund) AS refund_total
+                FROM fact_return
+                GROUP BY {ret_id_sql}
+            ) ret ON s.order_items_id = ret.ret_item_id
             LEFT JOIN (
-                SELECT order_item_id, COUNT(*) AS return_count, SUM(refund) AS refund_total
-                FROM returns
-                GROUP BY order_item_id
-            ) ret ON oi.order_item_id = ret.order_item_id
-            LEFT JOIN (
-                SELECT order_id, status, delivery_date, estimated_delivery_date
-                FROM (
-                    SELECT *, ROW_NUMBER() OVER (PARTITION BY order_id ORDER BY order_id) AS rn
-                    FROM shipments
-                ) WHERE rn = 1
-            ) shp ON o.order_id = shp.order_id
+                SELECT order_id, FIRST(status) AS status
+                FROM fact_shipments
+                GROUP BY order_id
+            ) shp ON s.order_id = shp.order_id
             LEFT JOIN (
                 SELECT order_id, SUM(amount) AS total_payment 
-                FROM payments 
+                FROM fact_payments 
                 GROUP BY order_id
-            ) pay ON o.order_id = pay.order_id
+            ) pay ON s.order_id = pay.order_id
         """
 
         query_employees = f"""
@@ -227,10 +334,10 @@ def load_full_dataset():
                 e.employee_id,
                 e.store_id,
                 e.salary,
-                COALESCE({store_city_sql}, 'Unknown Store City') AS store_city,
-                COALESCE({store_name_sql}, 'Store #' || CAST(e.store_id AS VARCHAR)) AS store_name
+                COALESCE(dstr.city, 'Unknown Store City') AS store_city,
+                COALESCE({emp_store_name_sql}, 'Store #' || CAST(e.store_id AS VARCHAR)) AS store_name
             FROM employees e
-            LEFT JOIN stores st ON e.store_id = st.store_id
+            LEFT JOIN dim_store dstr ON e.store_id = dstr.store_id
         """
 
         df_main = con.execute(query_main).fetchdf()
@@ -242,7 +349,6 @@ def load_full_dataset():
         return pd.DataFrame(), pd.DataFrame()
     finally:
         con.close()
-
 
 def process_dataframe(df):
     if df.empty:
@@ -269,28 +375,30 @@ def process_dataframe(df):
 
     return df
 
-
 def main():
     st.title("🛍️ Retail Enterprise Analytics Dashboard")
     st.caption("ระบบวิเคราะห์เชิงลึกข้อมูลการขาย สิทธิประโยชน์ ลูกค้า และห่วงโซ่อุปทาน (Enterprise Business Intelligence)")
 
     df, df_emp = load_full_dataset()
     if df.empty:
-        st.warning("⚠️ ไม่พบข้อมูลไฟล์ CSV ในโฟลเดอร์ที่กำหนด")
-        return
+        st.warning("⚠️ ไม่พบข้อมูลไฟล์ CSV ในโฟลเดอร์ที่กำหนด กรุณาตรวจสอบ Data Source")
+        st.stop() # หยุดการทำงานแทนการใช้ return
 
     st.sidebar.header("🔍 ตัวกรองข้อมูล (Filters)")
     min_d, max_d = df["order_date"].min().date(), df["order_date"].max().date()
 
-    date_range = st.sidebar.date_input(
-        "ช่วงวันที่", [min_d, max_d], min_value=min_d, max_value=max_d
+    # จัดการกรณีที่ผู้ใช้คลิกเลือกแค่วันเริ่มต้นวันเดียว
+    date_input = st.sidebar.date_input(
+        "ช่วงวันที่", 
+        value=(min_d, max_d),
+        min_value=min_d, 
+        max_value=max_d
     )
-    if isinstance(date_range, (list, tuple)) and len(date_range) == 2:
-        start_d, end_d = date_range
-    elif isinstance(date_range, (list, tuple)) and len(date_range) == 1:
-        start_d = end_d = date_range[0]
+    
+    if len(date_input) == 2:
+        start_d, end_d = date_input
     else:
-        start_d = end_d = date_range
+        start_d = end_d = date_input[0]
 
     cities = st.sidebar.multiselect(
         "สาขาตามเมือง (Store City)",
@@ -311,8 +419,8 @@ def main():
     ]
 
     if df_filtered.empty:
-        st.info("ไม่มีข้อมูลตรงกับเงื่อนไขตัวกรองที่เลือก")
-        return
+        st.info("💡 ไม่มีข้อมูลตรงกับเงื่อนไขตัวกรองที่เลือก กรุณาปรับช่วงเวลาหรือตัวกรองอื่นๆ")
+        st.stop() # หยุดการทำงานแทนการใช้ return
 
     df_emp_filtered = df_emp[df_emp["store_city"].isin(cities)] if not df_emp.empty else pd.DataFrame()
 
@@ -357,8 +465,11 @@ def main():
         
         monthly_df["aov"] = monthly_df.apply(lambda x: x["revenue"] / x["orders"] if x["orders"] > 0 else 0, axis=1)
         monthly_df["prev_revenue"] = monthly_df["revenue"].shift(1)
+        
+        # ปรับปรุง Logic การคำนวณ Growth ป้องกัน NaN และ Infinity
         monthly_df["mom_growth_%"] = monthly_df.apply(
-            lambda x: ((x["revenue"] - x["prev_revenue"]) / x["prev_revenue"] * 100) if pd.notnull(x["prev_revenue"]) and x["prev_revenue"] > 0 else 0,
+            lambda x: ((x["revenue"] - x["prev_revenue"]) / x["prev_revenue"] * 100) 
+            if pd.notna(x["prev_revenue"]) and x["prev_revenue"] > 0 else 0.0,
             axis=1
         )
 
@@ -477,7 +588,6 @@ def main():
                 ).properties(height=300),
                 use_container_width=True
             )
-
     with t3:
         st.header("🎟️ การวิเคราะห์ผลกระทบของโปรโมชันและการชำระเงิน")
 
@@ -694,20 +804,15 @@ def main():
 
         ship_df = df_filtered.drop_duplicates(subset=["order_id"]).copy()
 
-        if "is_on_time" in ship_df.columns and ship_df["is_on_time"].notnull().any():
-            on_time_count = ship_df["is_on_time"].sum()
-            total_shipped = ship_df["is_on_time"].count()
-            on_time_rate = (on_time_count / total_shipped * 100) if total_shipped > 0 else 0
-        else:
-            delivered_statuses = ["Delivered", "On Time", "Shipped", "Completed"]
-            delivered_count = ship_df["shipment_status"].isin(delivered_statuses).sum()
-            total_shipped = len(ship_df)
-            on_time_rate = (delivered_count / total_shipped * 100) if total_shipped > 0 else 0
+        delivered_statuses = ["Delivered", "On Time", "Shipped", "Completed"]
+        delivered_count = ship_df["shipment_status"].isin(delivered_statuses).sum()
+        total_shipped = len(ship_df)
+        on_time_rate = (delivered_count / total_shipped * 100) if total_shipped > 0 else 0
 
         shp_stat_df = ship_df.groupby("shipment_status", as_index=False)["order_id"].count()
 
         sh1, sh2 = st.columns(2)
-        sh1.metric("🚚 อัตราการจัดส่งตรงเวลา/สำเร็จ", f"{on_time_rate:.1f}%", f"{total_shipped:,} ออเดอร์ทั้งหมด")
+        sh1.metric("🚚 อัตราการจัดส่งสำเร็จ/ส่งมอบแล้ว", f"{on_time_rate:.1f}%", f"{total_shipped:,} ออเดอร์ทั้งหมด")
         sh2.metric("💸 มูลค่าเงินคืนรวมจากการส่งคืนสินค้า", f"${refunds:,.2f}")
 
         d1, d2 = st.columns(2)
@@ -733,7 +838,6 @@ def main():
                 ).properties(height=300),
                 use_container_width=True
             )
-
 
 if __name__ == "__main__":
     main()
