@@ -1,5 +1,7 @@
 # Mini-Project
 For Datawarehouse
+# Presentation
+https://canva.link/u97bsquxyowjw6u
 ### สมาชิก
 1.นางสาวกนกวรรณ ทองเทพ รหัสนักศึกษา 673020243-5
    
