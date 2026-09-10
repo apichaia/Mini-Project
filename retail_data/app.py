@@ -304,13 +304,13 @@ st.markdown(
     .main-title {
         font-size: 2.5rem;
         font-weight: 700;
-        color: #1F2937;
+        color: #FFC0CB;
         margin-bottom: 0.2rem;
     }
 
     .subtitle {
         font-size: 1.1rem;
-        color: #4B5563;
+        color: #FFC0CB;
         margin-bottom: 2rem;
     }
 
