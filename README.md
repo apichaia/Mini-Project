@@ -298,345 +298,492 @@ Grain ของ Payment Process:
 
 
 ---
+## 4.2 Multidimensional Data Model
 
-### 4.2 Multidimensional Data Model
+จาก Business Process ที่วิเคราะห์ สามารถออกแบบ Multidimensional Data Model โดยแบ่งข้อมูลออกเป็น **Fact Tables** และ **Dimension Tables** เพื่อรองรับการวิเคราะห์ข้อมูลใน Dashboard
 
-จาก Business Process ที่วิเคราะห์ สามารถออกแบบ Multidimensional Data Model โดยแบ่งข้อมูลออกเป็น Fact Tables และ Dimension Tables เพื่อรองรับการวิเคราะห์ข้อมูลใน Dashboard
+โครงสร้างโดยรวมเป็น **Fact Constellation / Galaxy Schema** เนื่องจากระบบมีหลาย Fact Tables ที่รองรับ Business Processes ที่แตกต่างกัน และมี Dimension ที่สามารถใช้ร่วมกันระหว่างหลาย Fact Tables
 
-#### Fact Tables
+---
+
+### 4.2.1 Fact Tables
 
 ระบบประกอบด้วย Fact Tables หลัก 4 ตาราง ได้แก่
 
-##### 1.Fact_Sales
+- `Fact_Sales`
+- `Fact_Returns`
+- `Fact_Shipments`
+- `Fact_Payments`
 
-ใช้เก็บข้อมูลเชิงตัวเลขที่เกี่ยวข้องกับการขายสินค้า
+---
+
+#### 1. Fact_Sales
+
+ใช้เก็บข้อมูลธุรกรรมการขายสินค้า
 
 **Grain:**
-> 1 แถว = 1 สินค้าใน 1 Order Line Item
 
-**Foreign Keys:**
-- `date_id`
+> 1 แถว = 1 สินค้าใน 1 Order Line Item (One Order Line Item)
+
+**Keys:**
+
+- `order_item_id`
+- `order_id`
 - `product_id`
+- `order_date`
 - `customer_id`
 - `store_id`
 - `promotion_id`
 - `supplier_id`
 
-**Degenerate/Reference Keys:**
-- `order_id`
-- `order_item_id`
-
 **Measures:**
+
 - `quantity` — จำนวนสินค้าที่ขาย
-- `unit_price` — ราคาต่อหน่วย
+- `unit_price` — ราคาขายต่อหน่วย
 - `sales_amount` — มูลค่าการขาย
-- `discount` — ส่วนลด
+- `discount` — ค่า Discount จาก Promotion
 
-Calculated Measures:
-- `Average Selling Price = Sales Amount / Quantity`
-- `Sales Growth Rate`
-- `Average Order Value (AOV)`
-- `Profit Margin` หากมีข้อมูลต้นทุน/กำไรเพิ่มเติมในข้อมูลต้นทาง
+**Sales Amount Calculation:**
 
+```text
+sales_amount = quantity × unit_price
+```
 
-##### 2. Fact_Returns
+**Calculated Measures:**
 
-ใช้เก็บข้อมูลการคืนสินค้า
+- Total Sales = `SUM(sales_amount)`
+- Units Sold = `SUM(quantity)`
+- Average Selling Price = `SUM(sales_amount) / SUM(quantity)`
+- Average Order Value (AOV) = `SUM(sales_amount) / COUNT(DISTINCT order_id)`
+- Sales Growth Rate
+
+---
+
+#### 2. Fact_Returns
+
+ใช้เก็บข้อมูลธุรกรรมการคืนสินค้า
 
 **Grain:**
+
 > 1 แถว = 1 Return Transaction
 
-**Foreign Keys:**
+**Keys:**
+
+- `return_id`
+- `order_item_id`
+- `order_id`
 - `product_id`
 - `customer_id`
 - `store_id`
 
-**Reference Keys:**
-- `return_id`
-- `order_item_id`
+**Measure:**
 
-**Measures:**
-- `refund` — จำนวนเงินคืนสินค้า
-- `returned_quantity` หากสามารถคำนวณหรือมีข้อมูลจำนวนสินค้าที่คืนจากข้อมูลต้นทาง
+- `refund` — จำนวนเงินที่คืนให้ลูกค้า
 
-Calculated Measure:
-- `Return Rate = Returned Quantity / Sold Quantity × 100`
+**Calculated Measures:**
 
-หมายเหตุ: ตาราง `Returns` มีเพียง `return_id`, `order_item_id` และ `refund` จึงไม่มีข้อมูล `return_reason` และไม่มีวันที่คืนสินค้าโดยตรง
+- Total Refund = `SUM(refund)`
+- Return Transaction Count = `COUNT(return_id)`
 
+> **หมายเหตุ:** Source Dataset ไม่มี `returned_quantity`, `return_date` และ `return_reason` จึงไม่สร้างข้อมูลดังกล่าวขึ้นมาเอง
 
-##### 3. Fact_Shipments
+---
 
-ใช้เก็บข้อมูลการจัดส่งสินค้า
+#### 3. Fact_Shipments
+
+ใช้เก็บข้อมูลธุรกรรมการจัดส่งสินค้า
 
 **Grain:**
+
 > 1 แถว = 1 Shipment
 
-**Foreign Keys / Reference Keys:**
+**Keys:**
+
+- `shipment_id`
 - `order_id`
 - `customer_id`
 - `store_id`
 
-**Measures / Attributes:**
+**Attribute:**
+
 - `status` — สถานะการจัดส่ง
 
-เนื่องจากข้อมูลต้นทางไม่มีวันที่จัดส่งหรือวันที่คาดว่าจะจัดส่ง จึงไม่สามารถคำนวณ Delivery Lead Time และ On-Time Delivery Rate ได้
+**Measure:**
 
+- Shipment Count = `COUNT(shipment_id)`
 
-##### 4. Fact_Payments
+**Calculated Measure:**
+
+- Shipment Status Rate
+
+```text
+Shipment Status Rate =
+Shipment Count by Status / Total Shipment Count × 100
+```
+
+---
+
+#### 4. Fact_Payments
 
 ใช้เก็บข้อมูลธุรกรรมการชำระเงิน
 
 **Grain:**
+
 > 1 แถว = 1 Payment Transaction
 
-**Reference Keys:**
+**Keys:**
+
 - `payment_id`
 - `order_id`
+- `customer_id`
+- `store_id`
+- `order_date`
 
 **Measure:**
+
 - `amount` — จำนวนเงินที่ชำระ
 
-หมายเหตุ: ไม่มี `payment_method` ในตาราง Payments ดังนั้นไม่สามารถวิเคราะห์การใช้งานวิธีการชำระเงินแต่ละประเภทได้
+**Calculated Measures:**
+
+- Total Payment Amount = `SUM(amount)`
+- Payment Transaction Count = `COUNT(payment_id)`
+
+> **หมายเหตุ:** `order_date` ใน Fact_Payments เป็นวันที่ของ Order ที่เชื่อมโยงกับ Payment ไม่ใช่ Payment Date เนื่องจาก Source Dataset ไม่มี Payment Date
 
 ---
 
-### 4.3 Dimension Tables
+### 4.2.2 Dimension Tables
 
-#### Dim_Date
+ระบบประกอบด้วย Dimension Tables ดังนี้
+
+- `Dim_Date`
+- `Dim_Product`
+- `Dim_Category`
+- `Dim_Customer`
+- `Dim_Store`
+- `Dim_Promotion`
+- `Dim_Supplier`
+- `Dim_Employee`
+
+---
+
+#### 1. Dim_Date
 
 ใช้สำหรับวิเคราะห์ข้อมูลตามช่วงเวลา
 
 **Primary Key:**
+
 - `date_id`
 
 **Attributes:**
+
 - `day`
 - `month`
 - `quarter`
 - `year`
 
-Hierarchy:
+**Hierarchy:**
 
-> Year → Quarter → Month → Day
+```text
+Year → Quarter → Month → Day
+```
 
-ใช้สำหรับการวิเคราะห์:
-- Daily Sales
-- Monthly Revenue
-- Quarterly Revenue
-- Yearly Revenue
-- Sales Growth Rate
+ใช้สำหรับวิเคราะห์ยอดขายตามวัน เดือน ไตรมาส และปี
 
+---
 
-#### Dim_Product
+#### 2. Dim_Product
 
-ใช้สำหรับวิเคราะห์ข้อมูลตามสินค้าและหมวดหมู่สินค้า
+ใช้สำหรับวิเคราะห์ข้อมูลตามสินค้า
 
 **Primary Key:**
+
 - `product_id`
 
 **Attributes:**
+
 - `category_id`
-- `category_name`
 - `supplier_id`
 - `price`
 
-โดยข้อมูล `category_name` มาจากตาราง `Categories` และนำมารวมไว้ใน Dim_Product เพื่อให้โครงสร้างสามารถรองรับ Star Schema ได้โดยไม่ต้องเชื่อมต่อ Dimension ผ่าน Dimension อีกชั้นหนึ่ง
+ใช้สำหรับวิเคราะห์ยอดขายตามสินค้า และเชื่อมโยงกับ `Dim_Category` เพื่อวิเคราะห์ยอดขายตามหมวดหมู่สินค้า
 
+---
 
-#### Dim_Customer
+#### 3. Dim_Category
 
-ใช้สำหรับวิเคราะห์พฤติกรรมและรายได้ของลูกค้า
+ใช้สำหรับวิเคราะห์ข้อมูลตามหมวดหมู่สินค้า
 
 **Primary Key:**
+
+- `category_id`
+
+**Attributes:**
+
+- `category_name` หากมีอยู่ใน Source Dataset
+
+ใช้สำหรับวิเคราะห์:
+
+- Category Revenue
+- Sales by Category
+
+---
+
+#### 4. Dim_Customer
+
+ใช้สำหรับวิเคราะห์ข้อมูลลูกค้า
+
+**Primary Key:**
+
 - `customer_id`
 
 **Attributes:**
+
 - `city`
 - `signup_date`
 
+ใช้สำหรับวิเคราะห์:
 
-#### Dim_Store
+- Customer Revenue
+- Order Count
+- Average Order Value (AOV)
 
-ใช้สำหรับวิเคราะห์ผลการดำเนินงานของแต่ละสาขา
+---
+
+#### 5. Dim_Store
+
+ใช้สำหรับวิเคราะห์ผลการดำเนินงานของร้าน
 
 **Primary Key:**
+
 - `store_id`
 
 **Attributes:**
+
 - `city`
 
-Hierarchy:
+ใช้สำหรับวิเคราะห์:
 
-> Store → City
+- Store Revenue
+- Store AOV
+- Refund by Store
 
+---
 
-#### Dim_Promotion
+#### 6. Dim_Promotion
 
-ใช้สำหรับวิเคราะห์ผลของโปรโมชั่นต่อยอดขาย
+ใช้สำหรับวิเคราะห์ผลของ Promotion ต่อการขาย
 
 **Primary Key:**
+
 - `promotion_id`
 
 **Attributes:**
+
 - `discount`
 
-ใช้ในการวิเคราะห์:
+ใช้สำหรับวิเคราะห์:
+
 - Promotion Revenue
 - Promotion Performance
-- Promotion Lift
+- Promotion vs Non-Promotion Sales
 
+---
 
-#### Dim_Supplier
+#### 7. Dim_Supplier
 
-ใช้สำหรับวิเคราะห์ข้อมูลของ Supplier
+ใช้สำหรับวิเคราะห์ข้อมูล Supplier
 
 **Primary Key:**
+
 - `supplier_id`
 
 **Attributes:**
+
 - `country`
 
-ใช้ในการวิเคราะห์ Supplier Revenue
+ใช้สำหรับวิเคราะห์:
 
+- Supplier Revenue
+- Product Count by Supplier
 
-#### Dim_Employee
+---
 
-ใช้สำหรับวิเคราะห์ข้อมูลพนักงานและความสัมพันธ์กับสาขา
+#### 8. Dim_Employee
+
+ใช้สำหรับเก็บข้อมูลพนักงานและความสัมพันธ์กับ Store
 
 **Primary Key:**
+
 - `employee_id`
 
 **Attributes:**
+
 - `store_id`
 - `salary`
 
-หมายเหตุ: ใน ER Diagram พนักงานเชื่อมโยงกับ Store แต่ไม่มีความสัมพันธ์โดยตรงกับ Orders ดังนั้นไม่สามารถใช้ข้อมูลนี้เพื่อคำนวณ Sales per Employee ได้โดยตรง
+> **หมายเหตุ:** Source Dataset ไม่มี `employee_id` ใน `Orders` หรือ `Order Items` ดังนั้น `Dim_Employee` ไม่ได้เชื่อมกับ `Fact_Sales` และไม่สามารถวิเคราะห์ Sales per Employee ได้โดยตรง
 
-### 4.3 Measures and Measure Types
+---
 
-Measures คือค่าตัวเลขที่ใช้ในการวิเคราะห์ข้อมูลใน Fact Tables โดยสามารถแบ่งตามลักษณะการนำไปคำนวณรวมได้เป็น Additive, Semi-Additive และ Non-Additive Measures
+### 4.2.3 Measures and Measure Types
 
-#### 1. Fact_Sales Measures
+Measures คือค่าตัวเลขที่ใช้วัดและวิเคราะห์ข้อมูลใน Fact Tables
 
-| Measure | Description | Measure Type |
+#### Fact_Sales Measures
+
+| Measure | Description | Type |
 |---|---|---|
-| `quantity` | จำนวนสินค้าที่ขายในแต่ละ Order Line Item | Additive |
-| `sales_amount` | มูลค่าการขายสินค้า | Additive |
+| `quantity` | จำนวนสินค้าที่ขาย | Additive |
+| `sales_amount` | มูลค่าการขาย | Additive |
 | `unit_price` | ราคาขายต่อหน่วย | Non-Additive |
-| `discount` | มูลค่าส่วนลดจาก Promotion | Additive |
+| `discount` | ค่า Discount | ขึ้นอยู่กับความหมายของ Source |
 
-Calculated Measures:
+**Calculated Measures:**
 
-| Calculated Measure | Formula | Measure Type |
+| Calculated Measure | Formula | Type |
 |---|---|---|
-| `Total Sales` | SUM(sales_amount) | Additive |
-| `Units Sold` | SUM(quantity) | Additive |
-| `Average Selling Price` | SUM(sales_amount) / SUM(quantity) | Non-Additive |
-| `Average Order Value (AOV)` | SUM(sales_amount) / COUNT(DISTINCT order_id) | Non-Additive |
-| `Sales Growth Rate` | ((Current Sales - Previous Sales) / Previous Sales) × 100 | Non-Additive |
-| `Promotion Revenue` | SUM(sales_amount) GROUP BY promotion_id | Additive |
-| `Supplier Revenue` | SUM(sales_amount) GROUP BY supplier_id | Additive |
+| Total Sales | `SUM(sales_amount)` | Additive |
+| Units Sold | `SUM(quantity)` | Additive |
+| Average Selling Price | `SUM(sales_amount) / SUM(quantity)` | Non-Additive |
+| AOV | `SUM(sales_amount) / COUNT(DISTINCT order_id)` | Non-Additive |
+| Sales Growth Rate | `(Current Sales - Previous Sales) / Previous Sales × 100` | Non-Additive |
 
+> `Promotion Revenue` และ `Supplier Revenue` เป็นการนำ `sales_amount` ไป Aggregate ตาม Dimension ที่ต้องการ ไม่ใช่ Base Measure ใหม่
 
-#### 2. Fact_Returns Measures
+---
 
-| Measure | Description | Measure Type |
+#### Fact_Returns Measures
+
+| Measure | Description | Type |
 |---|---|---|
-| `refund` | จำนวนเงินที่คืนให้ลูกค้า | Additive |
+| `refund` | จำนวนเงินที่คืน | Additive |
 
-Calculated Measures:
+**Calculated Measures:**
 
-| Calculated Measure | Formula | Measure Type |
+| Calculated Measure | Formula | Type |
 |---|---|---|
-| `Total Refund` | SUM(refund) | Additive |
-| `Return Rate` | Returned Transactions / Total Sales Transactions × 100 | Non-Additive |
+| Total Refund | `SUM(refund)` | Additive |
+| Return Transaction Count | `COUNT(return_id)` | Additive |
 
-หมายเหตุ: เนื่องจากตาราง `Returns` ไม่มี `returned_quantity` จึงไม่สามารถคำนวณ Return Rate จากจำนวนชิ้นสินค้าได้โดยตรง หากต้องการคำนวณ Return Rate ตามจำนวนสินค้า จำเป็นต้องมีข้อมูลจำนวนสินค้าที่คืนเพิ่มเติม
+---
 
+#### Fact_Shipments Measures
 
-#### 3. Fact_Shipments Measures
-
-| Measure | Description | Measure Type |
+| Measure | Description | Type |
 |---|---|---|
-| `shipment_count` | จำนวนรายการจัดส่ง | Additive |
+| Shipment Count | จำนวน Shipment | Additive |
 
-Calculated Measures:
+**Calculated Measure:**
 
-| Calculated Measure | Formula | Measure Type |
+| Calculated Measure | Formula | Type |
 |---|---|---|
-| `Shipment Count` | COUNT(shipment_id) | Additive |
-| `Shipment Status Rate` | Shipment Count by Status / Total Shipment Count × 100 | Non-Additive |
+| Shipment Status Rate | `Shipment Count by Status / Total Shipment Count × 100` | Non-Additive |
 
-หมายเหตุ: ตาราง `Shipments` มีเพียง `shipment_id`, `order_id` และ `status` จึงสามารถวิเคราะห์จำนวนและสัดส่วนตามสถานะได้ แต่ไม่สามารถคำนวณ Delivery Lead Time หรือ On-Time Delivery Rate ได้
+---
 
+#### Fact_Payments Measures
 
-#### 4. Fact_Payments Measures
-
-| Measure | Description | Measure Type |
+| Measure | Description | Type |
 |---|---|---|
 | `amount` | จำนวนเงินที่ชำระ | Additive |
 
-Calculated Measures:
+**Calculated Measures:**
 
-| Calculated Measure | Formula | Measure Type |
+| Calculated Measure | Formula | Type |
 |---|---|---|
-| `Total Payment Amount` | SUM(amount) | Additive |
-| `Payment Transaction Count` | COUNT(payment_id) | Additive |
-
-หมายเหตุ: ตาราง `Payments` ไม่มี `payment_method` จึงไม่สามารถวิเคราะห์ Payment Method Usage ตามประเภทวิธีการชำระเงินได้
+| Total Payment Amount | `SUM(amount)` | Additive |
+| Payment Transaction Count | `COUNT(payment_id)` | Additive |
 
 ---
 
-### 4.5 Summary of Fact and Dimension Tables
+### 4.2.4 Summary of Fact and Dimension Tables
 
 #### Fact Tables
 
-| Table | Grain / Purpose | Base Measures | Measure Type | Calculated Measures |
-|---|---|---|---|---|
-| `Fact_Sales` | 1 Order Line Item | `quantity`, `sales_amount`, `discount`, `unit_price` | Additive: `quantity`, `sales_amount`, `discount` / Non-Additive: `unit_price` | `Average Selling Price`, `AOV`, `Sales Growth Rate`, `Promotion Revenue`, `Supplier Revenue` |
-| `Fact_Returns` | 1 Return Transaction | `refund` | Additive | `Total Refund`, `Return Rate*` |
-| `Fact_Shipments` | 1 Shipment | `shipment_count` | Additive | `Shipment Status Rate` |
-| `Fact_Payments` | 1 Payment Transaction | `amount` | Additive | `Total Payment Amount`, `Payment Transaction Count` |
-
+| Table | Grain | Main Measures |
+|---|---|---|
+| `Fact_Sales` | 1 Order Line Item | `quantity`, `sales_amount`, `unit_price`, `discount` |
+| `Fact_Returns` | 1 Return Transaction | `refund` |
+| `Fact_Shipments` | 1 Shipment | Shipment Count |
+| `Fact_Payments` | 1 Payment Transaction | `amount` |
 
 #### Dimension Tables
 
-| Table | Type | Primary Key | Main Attributes | Purpose |
-|---|---|---|---|---|
-| `Dim_Date` | Dimension | `date_id` | `day`, `month`, `quarter`, `year` | วิเคราะห์ข้อมูลตามช่วงเวลา |
-| `Dim_Product` | Dimension | `product_id` | `category_id`, `category_name`, `supplier_id`, `price` | วิเคราะห์สินค้าและหมวดหมู่ |
-| `Dim_Customer` | Dimension | `customer_id` | `city`, `signup_date` | วิเคราะห์ลูกค้าและพฤติกรรมการซื้อ |
-| `Dim_Store` | Dimension | `store_id` | `city` | วิเคราะห์ยอดขายตามสาขา |
-| `Dim_Promotion` | Dimension | `promotion_id` | `discount` | วิเคราะห์ประสิทธิภาพของ Promotion |
-| `Dim_Supplier` | Dimension | `supplier_id` | `country` | วิเคราะห์ Supplier และรายได้จากสินค้า |
-| `Dim_Employee` | Dimension | `employee_id` | `store_id`, `salary` | วิเคราะห์ข้อมูลพนักงานและสาขา |
-
+| Table | Primary Key | Main Purpose |
+|---|---|---|
+| `Dim_Date` | `date_id` | วิเคราะห์ตามเวลา |
+| `Dim_Product` | `product_id` | วิเคราะห์สินค้า |
+| `Dim_Category` | `category_id` | วิเคราะห์หมวดหมู่สินค้า |
+| `Dim_Customer` | `customer_id` | วิเคราะห์ลูกค้า |
+| `Dim_Store` | `store_id` | วิเคราะห์ร้าน |
+| `Dim_Promotion` | `promotion_id` | วิเคราะห์ Promotion |
+| `Dim_Supplier` | `supplier_id` | วิเคราะห์ Supplier |
+| `Dim_Employee` | `employee_id` | วิเคราะห์ข้อมูลพนักงาน |
 
 ---
 
-### 4.6 Overall Multidimensional Model
+### 4.2.5 Overall Multidimensional Model
 
-Multidimensional Data Model ของระบบประกอบด้วยหลาย Fact Tables ที่ใช้ Dimension ร่วมกัน โดย `Fact_Sales` เป็น Fact หลักสำหรับการวิเคราะห์ยอดขาย และมี `Fact_Returns`, `Fact_Shipments` และ `Fact_Payments` สำหรับรองรับกระบวนการคืนสินค้า การจัดส่ง และการชำระเงินตามลำดับ
+โครงสร้างโดยรวมเป็น **Fact Constellation / Galaxy Schema** เนื่องจากมีหลาย Fact Tables ที่รองรับ Business Processes ที่แตกต่างกัน และมี Dimension ที่สามารถใช้ร่วมกันระหว่างหลาย Fact Tables
 
-Dimension ที่สามารถใช้ร่วมกันระหว่างหลาย Fact Tables ได้แก่ `Dim_Date`, `Dim_Product`, `Dim_Customer` และ `Dim_Store` ซึ่งช่วยให้สามารถวิเคราะห์ข้อมูลจากหลาย Business Processes ในมุมมองเดียวกัน
+- `Fact_Sales` — Sales Process
+- `Fact_Returns` — Return Process
+- `Fact_Shipments` — Shipment Process
+- `Fact_Payments` — Payment Process
 
-โครงสร้างโดยรวมสามารถอธิบายได้ว่าเป็น **Fact Constellation / Galaxy Schema** ซึ่งประกอบด้วยหลาย Star Schemas ที่ใช้ Conformed Dimensions ร่วมกัน
+โดยมี Dimensions ที่ใช้ร่วมกันตามความเหมาะสม ได้แก่
+
+- `Dim_Date`
+- `Dim_Product`
+- `Dim_Customer`
+- `Dim_Store`
+
+และมี Dimensions ที่ใช้สำหรับการวิเคราะห์เฉพาะด้าน เช่น
+
+- `Dim_Category`
+- `Dim_Promotion`
+- `Dim_Supplier`
+- `Dim_Employee`
+
+### Schema Structure
 
 ```text
                          Dim_Date
-                       /     |      \
-                      /      |       \
-                     ▼       ▼        ▼
-              Fact_Sales  Fact_Returns  Fact_Shipments
-                  │           │             │
-             Dimensions   Dimensions    Dimensions
-                  │
-                  ▼
-             Fact_Payments
+                            |
+                            ▼
+                       Fact_Sales
+                    /      |      \
+                   ▼       ▼       ▼
+            Dim_Product Dim_Customer Dim_Store
+                 |
+                 ▼
+            Dim_Category
 
+                       Fact_Sales
+                            |
+                     Dim_Promotion
+                            |
+                     Dim_Supplier
+
+
+          Dim_Product ───── Fact_Returns
+          Dim_Customer ──── Fact_Returns
+          Dim_Store ─────── Fact_Returns
+
+
+          Dim_Customer ──── Fact_Shipments
+          Dim_Store ─────── Fact_Shipments
+
+
+          Dim_Date ──────── Fact_Payments
+          Dim_Customer ──── Fact_Payments
+          Dim_Store ─────── Fact_Payments
 ```
 
+> **Schema Type:** Fact Constellation / Galaxy Schema
+
+> **Design Principle:** แต่ละ Fact Table มี Grain ที่ชัดเจน และใช้ Dimension เป็นมุมมองสำหรับการวิเคราะห์ Measures จากแต่ละ Business Process
 ### Data Model Diagram (Star Scheme) แซนด์วิช
 <img src="./readme_images/StarSchema1.jpg">
 
