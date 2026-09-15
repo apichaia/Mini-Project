@@ -785,7 +785,7 @@ Measures คือค่าตัวเลขที่ใช้วัดแล�
 
 > **Design Principle:** แต่ละ Fact Table มี Grain ที่ชัดเจน และใช้ Dimension เป็นมุมมองสำหรับการวิเคราะห์ Measures จากแต่ละ Business Process
 ### Data Model Diagram (Star Scheme) แซนด์วิช
-<img src="./readme_images/StarSchema1.jpg">
+<img src="./readme_images/galaxy_update.jpg">
 
 ## การดำเนินงานด้านการจัดการข้อมูลด้วยกระบวนการ ELT
 
