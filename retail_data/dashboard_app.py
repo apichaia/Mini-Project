@@ -16,44 +16,12 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown("""
-<style>
-    div[data-testid="stMetric"] {
-        background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(15, 23, 42, 0.95));
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 12px;
-        padding: 16px 18px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-        backdrop-filter: blur(8px);
-    }
-    div[data-testid="stMetricLabel"] > label {
-        font-size: 0.85rem !important;
-        font-weight: 600 !important;
-        color: #94a3b8 !important;
-        letter-spacing: 0.5px;
-    }
-    div[data-testid="stMetricValue"] > div {
-        font-size: 1.3rem !important;
-        font-weight: 700 !important;
-        color: #f8fafc !important;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-    }
-    button[data-baseweb="tab"] {
-        font-weight: 600 !important;
-        border-radius: 8px 8px 0 0 !important;
-        padding: 8px 20px !important;
-    }
-    .main .block-container { 
-        padding-top: 1.5rem; 
-        max-width: 95%;
-    }
-    .stAlert {
-        border-radius: 10px;
-    }
-</style>
-""", unsafe_allow_html=True)
+st.set_page_config(
+    page_title="Retail Enterprise Analytics Dashboard",
+    page_icon="🛍️",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 
