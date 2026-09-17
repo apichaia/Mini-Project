@@ -4,6 +4,7 @@ WITH source AS (
 
         store_id,
         city,
+        region,
 
         current_localtimestamp() AS insertion_timestamp
 
