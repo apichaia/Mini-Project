@@ -28,7 +28,8 @@ unique_source AS (
 SELECT
     store_id,
     city,
-    insertion_timestamp
+    region,
+    insertion_timestamp,
 
 FROM unique_source
 
