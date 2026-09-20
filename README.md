@@ -875,452 +875,533 @@ Dataset ที่ใช้ในโครงงานเป็นข้อมู
 รวมข้อมูลทั้งหมด
 <1,591,380 Records และ 39 Columns>
 
-# 2 ELT Process
-
-2.5 ELT Data Flow
-
-กระบวนการ ELT (Extract, Load, Transform) ของระบบ Retail Data Warehouse มีวัตถุประสงค์เพื่อรวบรวมข้อมูลจากแหล่งข้อมูลต้นทางให้อยู่ในรูปแบบที่เหมาะสมสำหรับการวิเคราะห์ข้อมูลเชิงธุรกิจ โดยระบบรับข้อมูลต้นทางในรูปแบบ CSV จำนวน 12 ตาราง และนำข้อมูลเข้าสู่ DuckDB เพื่อจัดเก็บและประมวลผล
-
-กระบวนการทำงานแบ่งออกเป็น 4 Layers ได้แก่
-
-Source Layer — ข้อมูลต้นทางจากไฟล์ CSV
-Staging Layer — ข้อมูลที่ Load เข้าสู่ DuckDB
-Transform Layer — การทำความสะอาดและแปลงข้อมูลด้วย dbt + DuckDB
-Data Warehouse Layer — ข้อมูลที่ถูกจัดโครงสร้างเป็น Dimension และ Fact Tables สำหรับการวิเคราะห์
-
-```
-┌─────────────────────────────────────────────┐
-│                SOURCE LAYER                 │
-│                                             │
-│              12 CSV Tables                  │
-│                                             │
-│ employees   returns      products            │
-│ suppliers   categories  promotions          │
-│ stores      customers   payments            │
-│ orders      order_items shipments           │
-└──────────────────────┬──────────────────────┘
-                       │
-                       │ Extract
-                       │ Python + Pandas
-                       ▼
-┌─────────────────────────────────────────────┐
-│              STAGING LAYER                  │
-│                                             │
-│                DuckDB                      │
-│                                             │
-│              12 stg_* Tables                │
-└──────────────────────┬──────────────────────┘
-                       │
-                       │ Transform
-                       │ dbt + DuckDB
-                       ▼
-┌─────────────────────────────────────────────┐
-│             TRANSFORM LAYER                 │
-│                                             │
-│ Data Cleaning                               │
-│ Data Type Conversion                        │
-│ Primary Key / Foreign Key Validation        │
-│ JOIN Related Tables                         │
-│ Business Calculation                        │
-└──────────────────────┬──────────────────────┘
-                       │
-                       ▼
-┌─────────────────────────────────────────────┐
-│          DATA WAREHOUSE LAYER               │
-│                                             │
-│ Dimensions — 7 Tables                      │
-│ Facts — 4 Tables                            │
-│                                             │
-│ Multiple Star Schema /                     │
-│ Fact Constellation Schema                   │
-└─────────────────────────────────────────────┘
-```
-
-1.1 Extract — การดึงข้อมูลจาก Source
-
-ขั้นตอน Extract เป็นการนำข้อมูลจากไฟล์ Source Data ซึ่งอยู่ในรูปแบบ CSV เข้าสู่กระบวนการ Data Warehouse โดยโครงการมีข้อมูลต้นทางทั้งหมด 12 ตาราง ได้แก่ Employees, Returns, Products, Suppliers, Categories, Promotions, Stores, Customers, Payments, Orders, Order Items และ Shipments
-
-ในขั้นตอนนี้ข้อมูลจะถูกอ่านและตรวจสอบเบื้องต้น เช่น จำนวน Records และจำนวน Columns ของแต่ละตาราง เพื่อยืนยันว่าข้อมูลสามารถนำเข้าสู่กระบวนการ ELT ได้อย่างครบถ้วน
-
-ผลลัพธ์ที่ได้:
-ได้ข้อมูล Source Data ทั้ง 12 ตารางที่พร้อมสำหรับนำเข้าสู่ Staging Layer
-
-1.2 Load — การนำข้อมูลเข้าสู่ Staging Layer
-
-หลังจากดึงข้อมูลจาก Source แล้ว ข้อมูลทั้งหมดจะถูกนำเข้าสู่ฐานข้อมูล DuckDB โดยจัดเก็บเป็น Staging Tables และตั้งชื่อในรูปแบบ stg_<table_name> เช่น stg_orders, stg_products และ stg_customers
-
-Staging Layer มีหน้าที่เป็นพื้นที่พักข้อมูลต้นทางก่อนเข้าสู่กระบวนการ Transformation โดยยังคงโครงสร้างข้อมูลจาก Source เพื่อให้ง่ายต่อการตรวจสอบและนำไปใช้งานในขั้นตอนถัดไป
-
-ผลลัพธ์ที่ได้:
-ได้ Staging Tables จำนวน 12 ตารางภายใน DuckDB ซึ่งพร้อมสำหรับการทำความสะอาด ตรวจสอบ และ Transformation
-
-1.3 Transformation — การแปลงข้อมูล
-
-ขั้นตอน Transformation เป็นการนำข้อมูลจาก Staging Layer มาปรับโครงสร้างให้เหมาะสมกับ Data Warehouse โดยใช้ dbt ร่วมกับ DuckDB ในการจัดการ SQL Transformation
-
-ข้อมูลจะถูกนำมาคัดเลือก Columns ที่จำเป็น รวมถึงเชื่อมโยงข้อมูลระหว่างตารางที่มีความสัมพันธ์กัน เพื่อสร้าง Dimension Tables และ Fact Tables ตามโครงสร้างของ Data Model
-
-1.3.1 Dimension Tables
-
-ในโครงการนี้มี Dimension Tables ทั้งหมด 7 ตาราง ได้แก่
-
-Dim_Date — ใช้สำหรับวิเคราะห์ข้อมูลตามวัน เดือน ไตรมาส และปี
-Dim_Product — เก็บข้อมูลสินค้า Category, Supplier และราคา
-Dim_Customer — เก็บข้อมูลลูกค้า เมือง และวันที่สมัครสมาชิก
-Dim_Store — เก็บข้อมูลสาขาและพื้นที่ของสาขา
-Dim_Promotion — เก็บข้อมูล Promotion และ Discount
-Dim_Supplier — เก็บข้อมูล Supplier และประเทศ
-Dim_Employee — เก็บข้อมูลพนักงาน Store และ Salary
-
-Dim_Employee ถูกจัดเก็บไว้ใน Data Warehouse เพื่อรักษาข้อมูลจาก Source Data อย่างไรก็ตาม เนื่องจากข้อมูล Employee จาก Source ไม่มีความสัมพันธ์โดยตรงกับ Order หรือ Fact Tables ที่กำหนดไว้ จึงไม่ได้แสดง Dim_Employee ใน Star Schema หลัก และไม่มีการสร้าง Relationship เพิ่มเติมที่ไม่มีอยู่ในข้อมูลต้นทาง
-
-ผลลัพธ์ที่ได้:
-ได้ Dimension Tables จำนวน 7 ตาราง ซึ่งทำหน้าที่เป็นข้อมูลอธิบายสำหรับใช้ประกอบการวิเคราะห์ข้อมูลใน Fact Tables
-
-1.3.2 Fact Tables
-
-ในโครงการนี้กำหนด Fact Tables ทั้งหมด 4 ตาราง ได้แก่
-
-Fact_Sales
-
-เก็บข้อมูลการขาย โดยกำหนด Grain เป็น 1 Order Line Item ต่อ 1 Record ประกอบด้วยข้อมูลจำนวนสินค้า ราคาต่อหน่วย ยอดขาย Discount และ Foreign Keys ที่เชื่อมไปยัง Dimension Tables ที่เกี่ยวข้อง
-
-ยอดขายสามารถคำนวณจากจำนวนสินค้าที่ขายคูณด้วยราคาต่อหน่วย
-
-ผลลัพธ์ที่ได้:
-สามารถนำไปวิเคราะห์ยอดขาย จำนวนสินค้าที่ขาย ราคาขาย และยอดขายตาม Product, Customer, Store, Promotion, Supplier และช่วงเวลาได้
-
-Fact_Return
-
-เก็บข้อมูลการคืนสินค้า โดยกำหนด Grain เป็น 1 Return Transaction ต่อ 1 Record และเชื่อมข้อมูล Return กับ Order Item และ Order เพื่อระบุสินค้า ลูกค้า และ Store ที่เกี่ยวข้อง
-
-ผลลัพธ์ที่ได้:
-สามารถวิเคราะห์จำนวนการคืนสินค้าและมูลค่า Refund รวมถึงเปรียบเทียบการคืนสินค้าตาม Product, Customer และ Store ได้
-
-Fact_Shipments
-
-เก็บข้อมูลการจัดส่ง โดยกำหนด Grain เป็น 1 Shipment ต่อ 1 Record และเชื่อมกับ Order เพื่อระบุ Customer และ Store ที่เกี่ยวข้อง
-
-ผลลัพธ์ที่ได้:
-สามารถวิเคราะห์จำนวน Shipment และสถานะของการจัดส่งได้
-
-Fact_Payments
-
-เก็บข้อมูลการชำระเงิน โดยกำหนด Grain เป็น 1 Payment Transaction ต่อ 1 Record และเชื่อมกับ Order เพื่อระบุ Customer และ Store ที่เกี่ยวข้อง
-
-ผลลัพธ์ที่ได้:
-สามารถวิเคราะห์ยอดเงินที่ชำระและจำนวนรายการชำระเงิน รวมถึงวิเคราะห์ตาม Customer, Store และช่วงเวลาที่เกี่ยวข้องได้
-
-1.4 Data Cleaning & Validation
-
-หลังจากนำข้อมูลเข้าสู่ Staging Layer จะมีการตรวจสอบและทำความสะอาดข้อมูลก่อนนำไปสร้าง Data Warehouse โดยตรวจสอบข้อมูลสำคัญ ได้แก่
-
-Missing Values ตรวจสอบค่าที่หายไปในแต่ละตาราง
-Duplicate Records ตรวจสอบข้อมูลที่ซ้ำกัน
-Primary Key ตรวจสอบว่าค่า Primary Key มีความเป็น Unique
-Foreign Key ตรวจสอบความถูกต้องของความสัมพันธ์ระหว่างตาราง
-Data Type ตรวจสอบและปรับชนิดข้อมูลให้เหมาะสม
-Date Data ตรวจสอบข้อมูลวันที่และนำไปสร้าง date_id
-Calculated Measures ตรวจสอบการคำนวณค่าที่เกิดจากการ Transformation เช่น sales_amount
-
-ผลลัพธ์ที่ได้:
-ข้อมูลมีความถูกต้องและมีความสอดคล้องมากขึ้นก่อนนำเข้าสู่ Final Data Warehouse และช่วยลดปัญหาที่อาจเกิดขึ้นระหว่างการวิเคราะห์ข้อมูล
-
-1.5 Final Data Warehouse Validation
-
-หลังจาก Transformation และ Data Cleaning เสร็จสิ้น จะมีการตรวจสอบ Final Data Warehouse เพื่อยืนยันว่าตารางที่กำหนดไว้ถูกสร้างขึ้นครบถ้วนและสามารถนำไปใช้งานได้
-
-Final Data Warehouse ประกอบด้วยทั้งหมด 11 ตาราง แบ่งเป็น
-
-Dimension Tables จำนวน 7 ตาราง
-
-Dim_Date
-Dim_Product
-Dim_Customer
-Dim_Store
-Dim_Promotion
-Dim_Supplier
-Dim_Employee
-
-Fact Tables จำนวน 4 ตาราง
-
-Fact_Sales
-Fact_Return
-Fact_Shipments
-Fact_Payments
-
-โดย Dim_Employee ยังคงถูกจัดเก็บอยู่ใน Data Warehouse แต่ไม่ได้เชื่อมต่อกับ Star Schema หลัก เนื่องจากไม่มี Relationship โดยตรงกับ Fact Tables จากข้อมูลต้นทาง
-
-ผลลัพธ์ที่ได้:
-ได้ Data Warehouse ที่ประกอบด้วย Dimension และ Fact Tables ครบตาม Data Model ที่กำหนด และพร้อมสำหรับนำไปใช้ในการวิเคราะห์ข้อมูล
-
-
-#CODE
-```
-1.1 Extract — อ่านข้อมูลจาก Source CSV
-วิธีการ
-
-ขั้นตอนนี้ใช้ Python และ Pandas สำหรับอ่านไฟล์ CSV ทั้งหมดจาก Source Data แล้วเก็บข้อมูลไว้ในรูปแบบ DataFrame เพื่อเตรียมเข้าสู่ขั้นตอน Load
-
-Code
-import os
-import pandas as pd
-
-tables = [
-    "employees",
-    "returns",
-    "products",
-    "suppliers",
-    "categories",
-    "promotions",
-    "stores",
-    "customers",
-    "payments",
-    "orders",
-    "order_items",
-    "shipments"
-]
-
-loaded_data = {}
-
-for table in tables:
-    file_path = os.path.join(path, table + ".csv")
-
-    df = pd.read_csv(file_path)
-
-    loaded_data[table] = df
-
-    print(
-        f"{table}.csv -> "
-        f"{len(df):,} records, "
-        f"{len(df.columns)} columns"
-    )
-การทำงานของโค้ด
-
-โค้ดนี้ทำหน้าที่อ่านไฟล์ CSV จำนวน 12 ตาราง ได้แก่ Employees, Returns, Products, Suppliers, Categories, Promotions, Stores, Customers, Payments, Orders, Order Items และ Shipments โดยใช้ pd.read_csv() จากนั้นเก็บข้อมูลของแต่ละตารางไว้ในตัวแปร loaded_data
-
-นอกจากนี้ยังแสดงจำนวน Records และจำนวน Columns ของแต่ละตาราง เพื่อใช้ตรวจสอบเบื้องต้นว่าข้อมูลสามารถอ่านเข้าสู่ระบบได้ครบถ้วน
-
-ผลลัพธ์ที่ได้
-
-ได้ข้อมูล Source Data ทั้ง 12 ตารางในรูปแบบ Pandas DataFrame ซึ่งพร้อมสำหรับนำเข้าสู่ DuckDB ในขั้นตอน Load
-
-1.2 Load — นำข้อมูลเข้าสู่ DuckDB Staging Layer
-วิธีการ
-
-หลังจาก Extract ข้อมูลจาก CSV แล้ว จะนำข้อมูลเข้าสู่ DuckDB โดยสร้างตารางใน Staging Layer และตั้งชื่อตารางด้วยรูปแบบ stg_<table_name> เพื่อแยกข้อมูลต้นทางออกจากตาราง Data Warehouse
-
-Code
-import duckdb
-
-con = duckdb.connect("retail_dw.duckdb")
-
-for table in tables:
-
-    con.execute(f"""
-        CREATE OR REPLACE TABLE stg_{table} AS
-        SELECT *
-        FROM read_csv_auto(?)
-    """, [os.path.join(path, table + ".csv")])
-
-    print(f"Created staging table: stg_{table}")
-การทำงานของโค้ด
-
-โค้ดนี้สร้าง Connection ไปยัง DuckDB และอ่านไฟล์ CSV แต่ละไฟล์เข้าสู่ฐานข้อมูลโดยใช้ read_csv_auto()
-
-สำหรับแต่ละ Source Table จะถูกสร้างเป็น Staging Table เช่น
-
-employees    → stg_employees
-products     → stg_products
-customers    → stg_customers
-orders       → stg_orders
-order_items  → stg_order_items
-
-การใช้ Prefix stg_ ช่วยให้สามารถแยกข้อมูลที่มาจาก Source ออกจากข้อมูลที่ผ่านการ Transformation แล้ว
-
-ผลลัพธ์ที่ได้
-
-ได้ Staging Layer จำนวน 12 ตาราง ภายใน DuckDB ซึ่งเป็นข้อมูลต้นทางที่พร้อมสำหรับขั้นตอน Data Cleaning และ Transformation
-
-1.3 Transformation — สร้าง Dimension Tables ด้วย dbt + DuckDB
-
-ขั้นตอน Transformation ใช้ dbt ร่วมกับ DuckDB เพื่อจัดการ SQL Models โดยนำข้อมูลจาก Staging Tables มาผ่านการคัดเลือก Columns, การ Join ตาราง และการสร้างข้อมูลที่เหมาะสมกับโครงสร้าง Data Warehouse
-
-1.3.1 สร้าง Dim_Date
-วิธีการ
-
-สร้าง Dimension สำหรับข้อมูลวันที่ โดยนำ order_date จาก stg_orders มาสร้าง date_id และ Attribute ต่าง ๆ ได้แก่ Year, Quarter, Month และ Day
-
-Code
-CREATE OR REPLACE TABLE dim_date AS
-
-SELECT DISTINCT
-
-    CAST(
-        STRFTIME(
-            TRY_CAST(order_date AS DATE),
-            '%Y%m%d'
-        ) AS INTEGER
-    ) AS date_id,
-
-    EXTRACT(YEAR FROM TRY_CAST(order_date AS DATE)) AS year,
-
-    EXTRACT(
-        QUARTER FROM TRY_CAST(order_date AS DATE)
-    ) AS quarter,
-
-    EXTRACT(
-        MONTH FROM TRY_CAST(order_date AS DATE)
-    ) AS month,
-
-    EXTRACT(
-        DAY FROM TRY_CAST(order_date AS DATE)
-    ) AS day
-
-FROM stg_orders
-
-WHERE TRY_CAST(order_date AS DATE) IS NOT NULL;
-การทำงานของโค้ด
-
-โค้ดนี้นำข้อมูลวันที่จาก stg_orders มาสร้างเป็น Dim_Date โดย
-
-สร้าง date_id ในรูปแบบ YYYYMMDD
-แยกปีเป็น year
-แยกไตรมาสเป็น quarter
-แยกเดือนเป็น month
-แยกวันเป็น day
-ใช้ DISTINCT เพื่อไม่ให้วันที่เดียวกันเกิดซ้ำ
-ผลลัพธ์ที่ได้
-
-ได้ตาราง Dim_Date สำหรับใช้เป็น Dimension ในการวิเคราะห์ข้อมูลตามช่วงเวลา เช่น รายปี รายไตรมาส และรายเดือน
-
-1.3.2 สร้าง Dim_Product
-วิธีการ
-
-นำข้อมูล Product จาก stg_products มาสร้าง Product Dimension โดยเก็บข้อมูลที่ใช้สำหรับวิเคราะห์สินค้า ได้แก่ Product ID, Category ID, Supplier ID และ Price
-
-Code
-CREATE OR REPLACE TABLE dim_product AS
-
+Retail Data Warehouse
+1. Project Overview
+
+โปรเจกต์นี้เป็นการพัฒนา Retail Data Warehouse สำหรับรวบรวม จัดเตรียม และวิเคราะห์ข้อมูลธุรกิจค้าปลีก โดยใช้แนวคิด ELT (Extract, Load, Transform) ร่วมกับ dbt และ DuckDB
+
+ข้อมูลต้นทางอยู่ในรูปแบบ CSV จำนวน 12 ตาราง และจัดเก็บไว้ใน GitHub Repository จากนั้นใช้ dbt seed ในการ Load ข้อมูลเข้าสู่ DuckDB และใช้ dbt Models ในการ Cleaning, Validation และ Transformation ก่อนสร้างเป็น Data Warehouse
+
+ELT Process
+GitHub Repository
+       │
+       │ 12 CSV Files
+       ▼
+    EXTRACT
+       │
+       ▼
+    dbt Seed
+       │
+       ▼
+     DuckDB
+       │
+       ▼
+  dbt Staging
+       │
+       ├── Cleaning
+       ├── Data Type Conversion
+       ├── Validation
+       └── Data Quality Tests
+       │
+       ▼
+   dbt Models
+       │
+       ├── Dimension Tables
+       └── Fact Tables
+       │
+       ▼
+ Data Warehouse
+       │
+       ▼
+ BI / Analytics
+2. Objectives
+No.	Objective
+1	รวบรวมข้อมูลจาก Source Data จำนวน 12 ตาราง
+2	จัดเก็บ Source Data ใน GitHub Repository
+3	ใช้ dbt เป็นเครื่องมือหลักในการจัดการ ELT
+4	ใช้ DuckDB เป็น Database และ Data Warehouse
+5	ทำความสะอาดและตรวจสอบคุณภาพข้อมูล
+6	แปลงข้อมูลให้อยู่ในรูปแบบ Dimension และ Fact Tables
+7	สร้าง Data Warehouse สำหรับการวิเคราะห์ข้อมูล
+8	รองรับการวิเคราะห์ข้อมูลด้วย SQL
+9	รองรับการนำข้อมูลไปสร้าง Report และ Dashboard
+3. Technologies
+Technology	Purpose
+GitHub	จัดเก็บ Source Data และ Source Code
+CSV	รูปแบบของ Source Data
+dbt	ELT, Cleaning, Validation และ Transformation
+DuckDB	Database และ Data Warehouse
+SQL	Data Transformation และ Data Analysis
+Python	Environment Setup และการเรียกใช้งาน Pipeline
+4. Source Data
+
+Source Data ประกอบด้วย CSV จำนวน 12 ตาราง
+
+No.	Source Table	Description
+1	employees	ข้อมูลพนักงาน
+2	returns	ข้อมูลการคืนสินค้า
+3	products	ข้อมูลสินค้า
+4	suppliers	ข้อมูลผู้จัดจำหน่าย
+5	categories	ข้อมูลหมวดหมู่สินค้า
+6	promotions	ข้อมูลโปรโมชั่น
+7	stores	ข้อมูลสาขา
+8	customers	ข้อมูลลูกค้า
+9	payments	ข้อมูลการชำระเงิน
+10	orders	ข้อมูลคำสั่งซื้อ
+11	order_items	รายการสินค้าในคำสั่งซื้อ
+12	shipments	ข้อมูลการจัดส่ง
+5. Repository Structure
+retail-data-warehouse/
+│
+├── seeds/
+│   ├── employees.csv
+│   ├── returns.csv
+│   ├── products.csv
+│   ├── suppliers.csv
+│   ├── categories.csv
+│   ├── promotions.csv
+│   ├── stores.csv
+│   ├── customers.csv
+│   ├── payments.csv
+│   ├── orders.csv
+│   ├── order_items.csv
+│   └── shipments.csv
+│
+├── models/
+│   │
+│   ├── staging/
+│   │   ├── stg_employees.sql
+│   │   ├── stg_returns.sql
+│   │   ├── stg_products.sql
+│   │   ├── stg_suppliers.sql
+│   │   ├── stg_categories.sql
+│   │   ├── stg_promotions.sql
+│   │   ├── stg_stores.sql
+│   │   ├── stg_customers.sql
+│   │   ├── stg_payments.sql
+│   │   ├── stg_orders.sql
+│   │   └── stg_order_items.sql
+│   │
+│   └── marts/
+│       ├── dim_date.sql
+│       ├── dim_product.sql
+│       ├── dim_category.sql
+│       ├── dim_customer.sql
+│       ├── dim_store.sql
+│       ├── dim_promotion.sql
+│       ├── dim_supplier.sql
+│       ├── dim_employee.sql
+│       ├── fact_sales.sql
+│       ├── fact_return.sql
+│       ├── fact_shipments.sql
+│       └── fact_payments.sql
+│
+├── tests/
+│
+├── dbt_project.yml
+│
+└── README.md
+6. ELT Process
+6.1 Extract
+
+ข้อมูลต้นทางทั้งหมดถูกจัดเก็บเป็น CSV ใน GitHub Repository
+
+Step	Process	Description
+1	Source	ข้อมูลต้นทางในรูปแบบ CSV
+2	GitHub	จัดเก็บ CSV ทั้ง 12 ตาราง
+3	Extract	dbt เข้าถึงข้อมูลจาก Repository
+4	Output	ข้อมูลพร้อมเข้าสู่ขั้นตอน Load
+7. Load
+
+หลังจาก Source Data ถูกจัดเก็บใน Repository แล้ว จะใช้ dbt Seed เพื่อ Load CSV เข้าสู่ DuckDB
+
+ติดตั้ง dbt และ DuckDB
+!pip install dbt-core dbt-duckdb -q
+
+ตรวจสอบ dbt
+
+!dbt --version
+
+ตรวจสอบการเชื่อมต่อ
+
+!dbt debug
+
+Load CSV
+
+!dbt seed
+Load Process
+Step	Input	Tool	Output
+1	CSV Files	GitHub	Source Data
+2	Source Data	dbt seed	DuckDB
+3	CSV Tables	DuckDB	Seed Tables
+8. DuckDB Configuration
+
+dbt ใช้ DuckDB เป็น Database สำหรับจัดเก็บข้อมูลและสร้าง Data Warehouse
+
+ไฟล์ profiles.yml
+
+retail_dw:
+  target: dev
+
+  outputs:
+
+    dev:
+      type: duckdb
+      path: retail.duckdb
+      threads: 4
+Configuration	Value
+Profile	retail_dw
+Target	dev
+Database	DuckDB
+Database File	retail.duckdb
+Threads	4
+9. dbt Project Configuration
+
+ไฟล์ dbt_project.yml
+
+name: 'retail_dw'
+
+version: '1.0.0'
+
+config-version: 2
+
+profile: 'retail_dw'
+
+model-paths: ["models"]
+seed-paths: ["seeds"]
+test-paths: ["tests"]
+
+models:
+
+  retail_dw:
+
+    staging:
+      +materialized: table
+
+    marts:
+      +materialized: table
+10. Staging Layer
+
+หลังจาก dbt seed โหลดข้อมูลเข้าสู่ DuckDB แล้ว จะเข้าสู่ Staging Layer
+
+หน้าที่ของ Staging Layer
+Process	Description
+Data Cleaning	ทำความสะอาดข้อมูล
+Data Type Conversion	แปลงชนิดข้อมูล
+Null Handling	จัดการค่า Null
+Data Preparation	เตรียมข้อมูลก่อน Transformation
+Validation	ตรวจสอบคุณภาพข้อมูล
+11. Staging Models
+11.1 stg_products
 SELECT
     product_id,
     category_id,
     supplier_id,
     price
 
-FROM stg_products;
-การทำงานของโค้ด
+FROM {{ ref('products') }}
+11.2 stg_categories
+SELECT
+    category_id,
+    category_name
 
-โค้ดนี้เลือกข้อมูลที่เกี่ยวข้องกับ Product จาก Staging Table แล้วสร้างเป็น dim_product
+FROM {{ ref('categories') }}
+11.3 stg_customers
+SELECT
+    customer_id,
+    city,
+    TRY_CAST(signup_date AS DATE) AS signup_date
 
-ผลลัพธ์ที่ได้
+FROM {{ ref('customers') }}
+11.4 stg_orders
+SELECT
+    order_id,
+    customer_id,
+    store_id,
+    TRY_CAST(order_date AS DATE) AS order_date,
+    promotion_id
 
-ได้ Dim_Product สำหรับใช้วิเคราะห์ยอดขายตามสินค้า Category และ Supplier
+FROM {{ ref('orders') }}
+11.5 stg_order_items
+SELECT
+    order_item_id,
+    order_id,
+    product_id,
+    CAST(qty AS INTEGER) AS qty,
+    CAST(price AS NUMERIC) AS price
 
-1.3.3 สร้าง Dim_Customer
-วิธีการ
+FROM {{ ref('order_items') }}
+12. Data Cleaning
 
-นำข้อมูลลูกค้าจาก stg_customers มาสร้าง Customer Dimension โดยเก็บ Customer ID, City และ Signup Date
+Data Cleaning ดำเนินการภายใน dbt Models
 
-Code
-CREATE OR REPLACE TABLE dim_customer AS
+Cleaning Process	Example
+Date Conversion	TRY_CAST(order_date AS DATE)
+Integer Conversion	CAST(qty AS INTEGER)
+Numeric Conversion	CAST(price AS NUMERIC)
+Null Handling	COALESCE(discount, 0)
+Duplicate Validation	unique
+Null Validation	not_null
+Relationship Validation	relationships
+
+ตัวอย่าง
+
+TRY_CAST(order_date AS DATE)
+CAST(qty AS INTEGER)
+CAST(price AS NUMERIC)
+COALESCE(discount, 0)
+13. Data Quality Validation
+
+ระบบใช้ dbt Tests ในการตรวจสอบคุณภาพข้อมูล
+
+Test	Purpose
+unique	ตรวจสอบข้อมูลไม่ให้มีค่า Key ซ้ำ
+not_null	ตรวจสอบข้อมูลที่ไม่ควรเป็น Null
+relationships	ตรวจสอบความสัมพันธ์ระหว่างตาราง
+
+ตัวอย่าง schema.yml
+
+version: 2
+
+models:
+
+  - name: stg_products
+
+    columns:
+
+      - name: product_id
+        tests:
+          - unique
+          - not_null
+
+      - name: category_id
+        tests:
+          - not_null
+
+      - name: supplier_id
+        tests:
+          - not_null
+
+
+  - name: stg_categories
+
+    columns:
+
+      - name: category_id
+        tests:
+          - unique
+          - not_null
+
+
+  - name: stg_customers
+
+    columns:
+
+      - name: customer_id
+        tests:
+          - unique
+          - not_null
+
+
+  - name: stg_orders
+
+    columns:
+
+      - name: order_id
+        tests:
+          - unique
+          - not_null
+
+      - name: customer_id
+        tests:
+          - not_null
+
+
+  - name: stg_order_items
+
+    columns:
+
+      - name: order_item_id
+        tests:
+          - unique
+          - not_null
+
+      - name: order_id
+        tests:
+          - not_null
+
+      - name: product_id
+        tests:
+          - not_null
+
+Run Test
+
+!dbt test
+
+หรือ Run Pipeline พร้อม Test
+
+!dbt build
+14. Data Warehouse
+
+หลังจากข้อมูลผ่าน Staging และ Data Quality Validation แล้ว จะถูก Transform เป็น Data Warehouse
+
+Dimension Tables
+
+มีทั้งหมด 8 Dimension Tables
+
+No.	Dimension Table	Description
+1	dim_date	ข้อมูลวันที่
+2	dim_product	ข้อมูลสินค้า
+3	dim_category	ข้อมูลหมวดหมู่สินค้า
+4	dim_customer	ข้อมูลลูกค้า
+5	dim_store	ข้อมูลสาขา
+6	dim_promotion	ข้อมูลโปรโมชั่น
+7	dim_supplier	ข้อมูลผู้จัดจำหน่าย
+8	dim_employee	ข้อมูลพนักงาน
+Fact Tables
+
+มีทั้งหมด 4 Fact Tables
+
+No.	Fact Table	Grain	Description
+1	fact_sales	1 Order Line Item	ข้อมูลการขาย
+2	fact_return	1 Return Transaction	ข้อมูลการคืนสินค้า
+3	fact_shipments	1 Shipment	ข้อมูลการจัดส่ง
+4	fact_payments	1 Payment Transaction	ข้อมูลการชำระเงิน
+Final Data Warehouse
+Type	Number of Tables
+Dimension	8
+Fact	4
+Total	12
+15. Dimension Tables
+15.1 Dim Date
+
+ไฟล์ dim_date.sql
+
+SELECT DISTINCT
+
+    CAST(
+        STRFTIME(
+            order_date,
+            '%Y%m%d'
+        ) AS INTEGER
+    ) AS date_id,
+
+    EXTRACT(YEAR FROM order_date) AS year,
+
+    EXTRACT(QUARTER FROM order_date) AS quarter,
+
+    EXTRACT(MONTH FROM order_date) AS month,
+
+    EXTRACT(DAY FROM order_date) AS day
+
+FROM {{ ref('stg_orders') }}
+
+WHERE order_date IS NOT NULL
+Columns
+Column	Description
+date_id	รหัสวันที่
+year	ปี
+quarter	ไตรมาส
+month	เดือน
+day	วัน
+15.2 Dim Product
+SELECT
+
+    product_id,
+    category_id,
+    supplier_id,
+    price
+
+FROM {{ ref('stg_products') }}
+Columns
+Column	Description
+product_id	รหัสสินค้า
+category_id	รหัสหมวดหมู่
+supplier_id	รหัสผู้จัดจำหน่าย
+price	ราคาสินค้า
+15.3 Dim Category
+
+ไฟล์ dim_category.sql
 
 SELECT
+
+    category_id,
+    category_name
+
+FROM {{ ref('stg_categories') }}
+Columns
+Column	Description
+category_id	รหัสหมวดหมู่
+category_name	ชื่อหมวดหมู่
+
+ความสัมพันธ์
+
+dim_category
+      │
+      │ category_id
+      ▼
+dim_product
+15.4 Dim Customer
+SELECT
+
     customer_id,
     city,
     signup_date
 
-FROM stg_customers;
-การทำงานของโค้ด
-
-โค้ดทำการเลือก Attribute ที่จำเป็นจากข้อมูล Customer ใน Staging Layer และสร้างเป็น Dimension Table
-
-ผลลัพธ์ที่ได้
-
-ได้ Dim_Customer สำหรับวิเคราะห์ข้อมูลตามลูกค้าและพื้นที่ของลูกค้า
-
-1.3.4 สร้าง Dim_Store
-วิธีการ
-
-นำข้อมูล Store จาก stg_stores มาสร้าง Store Dimension โดยเก็บ Store ID และ City
-
-Code
-CREATE OR REPLACE TABLE dim_store AS
-
+FROM {{ ref('stg_customers') }}
+Column	Description
+customer_id	รหัสลูกค้า
+city	เมือง
+signup_date	วันที่สมัครสมาชิก
+15.5 Dim Store
 SELECT
+
     store_id,
     city
 
-FROM stg_stores;
-ผลลัพธ์ที่ได้
-
-ได้ Dim_Store สำหรับใช้วิเคราะห์ผลการดำเนินงานของแต่ละสาขา
-
-1.3.5 สร้าง Dim_Promotion
-วิธีการ
-
-นำข้อมูล Promotion จาก stg_promotions มาสร้าง Promotion Dimension โดยเก็บ Promotion ID และ Discount
-
-Code
-CREATE OR REPLACE TABLE dim_promotion AS
-
+FROM {{ ref('stg_stores') }}
+Column	Description
+store_id	รหัสสาขา
+city	ที่ตั้งสาขา
+15.6 Dim Promotion
 SELECT
+
     promotion_id,
     discount
 
-FROM stg_promotions;
-ผลลัพธ์ที่ได้
-
-ได้ Dim_Promotion สำหรับวิเคราะห์ผลของ Promotion ที่เกี่ยวข้องกับรายการขาย
-
-1.3.6 สร้าง Dim_Supplier
-วิธีการ
-
-นำข้อมูล Supplier จาก stg_suppliers มาสร้าง Supplier Dimension โดยเก็บ Supplier ID และ Country
-
-Code
-CREATE OR REPLACE TABLE dim_supplier AS
-
+FROM {{ ref('stg_promotions') }}
+Column	Description
+promotion_id	รหัสโปรโมชั่น
+discount	ส่วนลด
+15.7 Dim Supplier
 SELECT
+
     supplier_id,
     country
 
-FROM stg_suppliers;
-ผลลัพธ์ที่ได้
-
-ได้ Dim_Supplier สำหรับใช้วิเคราะห์ยอดขายและข้อมูลสินค้าตาม Supplier และประเทศ
-
-1.3.7 สร้าง Dim_Employee
-วิธีการ
-
-นำข้อมูล Employee จาก stg_employees มาสร้าง Employee Dimension เพื่อเก็บข้อมูลพนักงานไว้ใน Data Warehouse
-
-Code
-CREATE OR REPLACE TABLE dim_employee AS
-
+FROM {{ ref('stg_suppliers') }}
+Column	Description
+supplier_id	รหัสผู้จัดจำหน่าย
+country	ประเทศ
+15.8 Dim Employee
 SELECT
+
     employee_id,
     store_id,
     salary
 
-FROM stg_employees;
-การทำงานของโค้ด
+FROM {{ ref('stg_employees') }}
+Column	Description
+employee_id	รหัสพนักงาน
+store_id	รหัสสาขา
+salary	เงินเดือน
 
-โค้ดนี้สร้าง Dim_Employee จากข้อมูลพนักงานใน Source Data โดยเก็บ Employee ID, Store ID และ Salary
+dim_employee ถูกจัดเก็บใน Data Warehouse แต่ไม่ได้เชื่อมกับ Main Star Schema หากไม่มีความสัมพันธ์โดยตรงจาก Source Data
 
-อย่างไรก็ตาม ในโครงสร้าง Data Warehouse นี้ ไม่มีความสัมพันธ์โดยตรงระหว่าง Employee กับ Order หรือ Fact Tables ที่กำหนดไว้ ดังนั้นจึงไม่ได้สร้าง Relationship เพิ่มขึ้นมาเองเพื่อเชื่อม Employee เข้ากับ Fact
+16. Fact Tables
+16.1 Fact Sales
 
-ผลลัพธ์ที่ได้
-
-ได้ Dim_Employee อยู่ภายใน Data Warehouse เพื่อรักษาข้อมูลพนักงานจาก Source Data แต่ ไม่ได้แสดงใน Star Schema หลัก เนื่องจากไม่มี Relationship ที่เหมาะสมกับ Fact Tables
-
-1.3.8 สร้าง Fact_Sales
-วิธีการ
-
-สร้าง Fact Sales โดยกำหนด Grain เป็น 1 Order Line Item ต่อ 1 Record จาก stg_order_items แล้วเชื่อมกับ Orders, Products และ Promotions เพื่อเพิ่มข้อมูลที่จำเป็นสำหรับการวิเคราะห์ยอดขาย
-
-Code
-CREATE OR REPLACE TABLE fact_sales AS
+Grain: 1 Order Line Item
 
 SELECT
 
@@ -1328,70 +1409,68 @@ SELECT
 
     CAST(
         STRFTIME(
-            TRY_CAST(o.order_date AS DATE),
+            o.order_date,
             '%Y%m%d'
         ) AS INTEGER
     ) AS date_id,
 
     oi.product_id,
+
+    p.category_id,
+
     o.customer_id,
+
     o.store_id,
-    oi.promotion_id,
+
+    o.promotion_id,
 
     p.supplier_id,
 
     oi.order_id,
-    oi.quantity,
-    oi.unit_price,
 
-    oi.quantity * oi.unit_price AS sales_amount,
+    oi.qty AS quantity,
 
-    COALESCE(pr.discount, 0) AS discount
+    oi.price AS unit_price,
 
-FROM stg_order_items oi
+    oi.qty * oi.price AS sales_amount,
 
-LEFT JOIN stg_orders o
+    COALESCE(
+        pr.discount,
+        0
+    ) AS discount
+
+FROM {{ ref('stg_order_items') }} oi
+
+LEFT JOIN {{ ref('stg_orders') }} o
     ON oi.order_id = o.order_id
 
-LEFT JOIN stg_products p
+LEFT JOIN {{ ref('stg_products') }} p
     ON oi.product_id = p.product_id
 
-LEFT JOIN stg_promotions pr
-    ON oi.promotion_id = pr.promotion_id;
-การทำงานของโค้ด
+LEFT JOIN {{ ref('stg_promotions') }} pr
+    ON o.promotion_id = pr.promotion_id
+Columns
+Column	Description
+order_items_id	รหัสรายการสินค้า
+date_id	รหัสวันที่
+product_id	รหัสสินค้า
+category_id	รหัสหมวดหมู่
+customer_id	รหัสลูกค้า
+store_id	รหัสสาขา
+promotion_id	รหัสโปรโมชั่น
+supplier_id	รหัสผู้จัดจำหน่าย
+order_id	รหัสคำสั่งซื้อ
+quantity	จำนวนสินค้า
+unit_price	ราคาต่อหน่วย
+sales_amount	มูลค่าการขาย
+discount	ส่วนลด
 
-โค้ดนี้นำ order_items เป็นตารางหลัก เนื่องจากแต่ละรายการสินค้าใน Order เป็นระดับข้อมูลที่ต้องการวิเคราะห์
-
-จากนั้นทำการ Join กับ
-
-stg_orders เพื่อดึงข้อมูล Order Date, Customer และ Store
-stg_products เพื่อดึง Supplier
-stg_promotions เพื่อดึง Discount
-
-และคำนวณ
+สูตร
 
 sales_amount = quantity × unit_price
-ผลลัพธ์ที่ได้
+16.2 Fact Return
 
-ได้ Fact_Sales ซึ่งสามารถนำไปใช้วิเคราะห์
-
-จำนวนสินค้าที่ขาย
-ยอดขาย
-ราคาขาย
-Discount
-ยอดขายตามสินค้า
-ยอดขายตามลูกค้า
-ยอดขายตาม Store
-ยอดขายตาม Promotion
-ยอดขายตาม Supplier
-ยอดขายตามช่วงเวลา
-1.3.9 สร้าง Fact_Return
-วิธีการ
-
-สร้าง Fact Return โดยกำหนด Grain เป็น 1 Return Transaction ต่อ 1 Record และใช้ order_items และ orders เพื่อค้นหาข้อมูลสินค้า ลูกค้า Store และวันที่ที่เกี่ยวข้อง
-
-Code
-CREATE OR REPLACE TABLE fact_return AS
+Grain: 1 Return Transaction
 
 SELECT
 
@@ -1399,75 +1478,71 @@ SELECT
 
     CAST(
         STRFTIME(
-            TRY_CAST(o.order_date AS DATE),
+            o.order_date,
             '%Y%m%d'
         ) AS INTEGER
     ) AS date_id,
 
     oi.product_id,
+
+    p.category_id,
+
     o.customer_id,
+
     o.store_id,
 
     r.order_item_id AS order_items_id,
+
     r.refund
 
-FROM stg_returns r
+FROM {{ ref('stg_returns') }} r
 
-LEFT JOIN stg_order_items oi
+LEFT JOIN {{ ref('stg_order_items') }} oi
     ON r.order_item_id = oi.order_item_id
 
-LEFT JOIN stg_orders o
-    ON oi.order_id = o.order_id;
-การทำงานของโค้ด
+LEFT JOIN {{ ref('stg_products') }} p
+    ON oi.product_id = p.product_id
 
-โค้ดนี้เริ่มจากข้อมูล Return แล้ว Join ไปยัง Order Item และ Order เพื่อระบุว่าสินค้าที่คืนเป็นสินค้าอะไร และเกี่ยวข้องกับ Customer และ Store ใด
+LEFT JOIN {{ ref('stg_orders') }} o
+    ON oi.order_id = o.order_id
+Column	Description
+return_id	รหัสการคืนสินค้า
+date_id	รหัสวันที่
+product_id	รหัสสินค้า
+category_id	รหัสหมวดหมู่
+customer_id	รหัสลูกค้า
+store_id	รหัสสาขา
+order_items_id	รหัสรายการสินค้า
+refund	จำนวนเงินคืน
+16.3 Fact Shipments
 
-ผลลัพธ์ที่ได้
-
-ได้ Fact_Return สำหรับวิเคราะห์
-
-จำนวนรายการคืนสินค้า
-มูลค่า Refund
-การคืนสินค้าตาม Product
-การคืนสินค้าตาม Customer
-การคืนสินค้าตาม Store
-1.3.10 สร้าง Fact_Shipments
-วิธีการ
-
-สร้าง Fact Shipment โดยกำหนด Grain เป็น 1 Shipment ต่อ 1 Record และเชื่อมข้อมูล Shipment กับ Order เพื่อระบุ Customer และ Store ที่เกี่ยวข้อง
-
-Code
-CREATE OR REPLACE TABLE fact_shipments AS
+Grain: 1 Shipment
 
 SELECT
 
     s.shipment_id AS shipments_id,
 
     o.customer_id,
+
     o.store_id,
+
     s.order_id,
 
     s.status
 
-FROM stg_shipments s
+FROM {{ ref('stg_shipments') }} s
 
-LEFT JOIN stg_orders o
-    ON s.order_id = o.order_id;
-การทำงานของโค้ด
+LEFT JOIN {{ ref('stg_orders') }} o
+    ON s.order_id = o.order_id
+Column	Description
+shipments_id	รหัสการจัดส่ง
+customer_id	รหัสลูกค้า
+store_id	รหัสสาขา
+order_id	รหัสคำสั่งซื้อ
+status	สถานะการจัดส่ง
+16.4 Fact Payments
 
-โค้ดนำข้อมูล Shipment มาเชื่อมกับ Order ผ่าน order_id เพื่อเพิ่มข้อมูล Customer และ Store
-
-ผลลัพธ์ที่ได้
-
-ได้ Fact_Shipments สำหรับวิเคราะห์จำนวน Shipment และสถานะการจัดส่ง
-
-1.3.11 สร้าง Fact_Payments
-วิธีการ
-
-สร้าง Fact Payment โดยกำหนด Grain เป็น 1 Payment Transaction ต่อ 1 Record และเชื่อมกับ Order เพื่อเพิ่มข้อมูล Date, Customer และ Store
-
-Code
-CREATE OR REPLACE TABLE fact_payments AS
+Grain: 1 Payment Transaction
 
 SELECT
 
@@ -1475,117 +1550,141 @@ SELECT
 
     CAST(
         STRFTIME(
-            TRY_CAST(o.order_date AS DATE),
+            o.order_date,
             '%Y%m%d'
         ) AS INTEGER
     ) AS date_id,
 
     o.customer_id,
+
     o.store_id,
+
     p.order_id,
 
     p.amount
 
-FROM stg_payments p
+FROM {{ ref('stg_payments') }} p
 
-LEFT JOIN stg_orders o
-    ON p.order_id = o.order_id;
-การทำงานของโค้ด
+LEFT JOIN {{ ref('stg_orders') }} o
+    ON p.order_id = o.order_id
+Column	Description
+payment_id	รหัสการชำระเงิน
+date_id	รหัสวันที่
+customer_id	รหัสลูกค้า
+store_id	รหัสสาขา
+order_id	รหัสคำสั่งซื้อ
+amount	จำนวนเงิน
+17. Data Warehouse Schema
 
-โค้ดนี้นำ Payment มาเชื่อมกับ Order ผ่าน order_id เพื่อให้สามารถระบุ Customer, Store และวันที่ของ Order ที่เกี่ยวข้องกับ Payment ได้
+ระบบใช้รูปแบบ Multiple Star Schema / Fact Constellation Schema
 
-ผลลัพธ์ที่ได้
+                         dim_date
+                            │
+                            ▼
+dim_customer ──────────► fact_sales ◄────────── dim_product
+                            │                       │
+                            │                       ▼
+                            │                 dim_category
+                            │
+dim_store ─────────────────┤
+                            │
+dim_promotion ──────────────┤
+                            │
+dim_supplier ───────────────┘
+                         dim_date
+                            │
+                            ▼
+                       fact_return
+                       /    │    \
+                      ▼     ▼     ▼
+                dim_product
+                dim_customer
+                dim_store
+                  dim_customer
+                       │
+                       ▼
+                 fact_shipments
+                       ▲
+                       │
+                   dim_store
+                         dim_date
+                            │
+                            ▼
+                     fact_payments
+                       /       \
+                      ▼         ▼
+               dim_customer  dim_store
+18. dbt DAG
+CSV Seeds
+   │
+   ├── employees
+   ├── returns
+   ├── products
+   ├── suppliers
+   ├── categories
+   ├── promotions
+   ├── stores
+   ├── customers
+   ├── payments
+   ├── orders
+   ├── order_items
+   └── shipments
+          │
+          ▼
+    Staging Models
+          │
+          ▼
+ Cleaning & Validation
+          │
+          ▼
+     Final Models
+          │
+     ┌────┴────┐
+     ▼         ▼
+Dimensions    Facts
+     │         │
+     └────┬────┘
+          ▼
+   Data Warehouse
+19. Run Pipeline
+19.1 ตรวจสอบ Project
+!dbt debug
+19.2 Load Source Data
+!dbt seed
+19.3 Run Models
+!dbt run
+19.4 Run Data Quality Tests
+!dbt test
+19.5 Run Full Pipeline
+!dbt build
+Pipeline Commands
+Command	Function
+dbt debug	ตรวจสอบ Configuration และ Connection
+dbt seed	Load CSV เข้า DuckDB
+dbt run	Run dbt Models
+dbt test	Run Data Quality Tests
+dbt build	Run Pipeline และ Tests ตาม Dependency
+20. ตรวจสอบ Data Warehouse
 
-ได้ Fact_Payments สำหรับวิเคราะห์
+ใช้ Python และ DuckDB ตรวจสอบตารางที่สร้างขึ้น
 
-ยอดเงินที่ชำระ
-จำนวนรายการ Payment
-ยอด Payment ตาม Customer
-ยอด Payment ตาม Store
-ยอด Payment ตามช่วงเวลา
-1.4 Data Cleaning & Validation
-1.4.1 ตรวจสอบ Missing Values
-วิธีการ
+import duckdb
 
-ตรวจสอบค่าที่หายไปในแต่ละ Staging Table เพื่อค้นหาข้อมูลที่อาจส่งผลต่อการ Transformation
+con = duckdb.connect("retail.duckdb")
 
-Code
-for table in tables:
+tables = con.execute("""
+    SELECT table_name
+    FROM information_schema.tables
+    WHERE table_schema = 'main'
+    ORDER BY table_name
+""").df()
 
-    df = loaded_data[table]
-
-    missing = df.isnull().sum()
-
-    print(f"\n{table}")
-    print(missing[missing > 0])
-ผลลัพธ์ที่ได้
-
-ทราบว่าตารางและ Columns ใดมี Missing Values และสามารถนำข้อมูลดังกล่าวไปพิจารณาก่อนสร้าง Dimension และ Fact Tables
-
-1.4.2 ตรวจสอบ Duplicate Records
-วิธีการ
-
-ตรวจสอบข้อมูลที่ซ้ำกันในแต่ละ Source Table
-
-Code
-for table in tables:
-
-    df = loaded_data[table]
-
-    duplicate_count = df.duplicated().sum()
-
-    print(
-        f"{table}: "
-        f"{duplicate_count:,} duplicate rows"
-    )
-ผลลัพธ์ที่ได้
-
-ทราบจำนวนข้อมูลที่ซ้ำกันในแต่ละตาราง เพื่อป้องกัน Duplicate Records ที่อาจส่งผลต่อผลลัพธ์ของ Fact Tables
-
-1.4.3 ตรวจสอบ Primary Key
-วิธีการ
-
-ตรวจสอบว่า Primary Key ของแต่ละ Source Table มีค่าซ้ำหรือไม่
-
-Code
-primary_keys = {
-    "employees": "employee_id",
-    "returns": "return_id",
-    "products": "product_id",
-    "suppliers": "supplier_id",
-    "categories": "category_id",
-    "promotions": "promotion_id",
-    "stores": "store_id",
-    "customers": "customer_id",
-    "payments": "payment_id",
-    "orders": "order_id",
-    "order_items": "order_item_id",
-    "shipments": "shipment_id"
-}
-
-for table, pk in primary_keys.items():
-
-    df = loaded_data[table]
-
-    duplicate_pk = df[pk].duplicated().sum()
-
-    print(
-        f"{table}.{pk}: "
-        f"{duplicate_pk:,} duplicate keys"
-    )
-ผลลัพธ์ที่ได้
-
-สามารถตรวจสอบความเป็น Unique ของ Primary Key ในแต่ละ Source Table ก่อนนำข้อมูลไปสร้าง Data Warehouse
-
-1.5 Final Data Warehouse Validation
-วิธีการ
-
-หลังจากสร้าง Dimension และ Fact Tables แล้ว จะตรวจสอบว่าตารางที่ต้องการมีอยู่ครบถ้วนใน Data Warehouse
-
-Code
+display(tables)
+ตรวจสอบจำนวน Records
 final_tables = [
     'dim_date',
     'dim_product',
+    'dim_category',
     'dim_customer',
     'dim_store',
     'dim_promotion',
@@ -1599,54 +1698,176 @@ final_tables = [
 
 for table in final_tables:
 
-    result = con.execute(f"""
-        SELECT COUNT(*)
-        FROM {table}
-    """).fetchone()[0]
+    count = con.execute(
+        f"SELECT COUNT(*) FROM {table}"
+    ).fetchone()[0]
 
     print(
-        f"{table}: "
-        f"{result:,} records"
+        f"{table:20} : "
+        f"{count:,} records"
     )
-การทำงานของโค้ด
 
-โค้ดนี้ตรวจสอบจำนวน Records ของ Dimension และ Fact Tables หลังจาก Transformation เสร็จสิ้น เพื่อยืนยันว่าตารางถูกสร้างขึ้นและสามารถ Query ได้
+ผลลัพธ์ที่ควรได้
 
-ผลลัพธ์ที่ได้
+Table Type	Table
+Dimension	dim_date
+Dimension	dim_product
+Dimension	dim_category
+Dimension	dim_customer
+Dimension	dim_store
+Dimension	dim_promotion
+Dimension	dim_supplier
+Dimension	dim_employee
+Fact	fact_sales
+Fact	fact_return
+Fact	fact_shipments
+Fact	fact_payments
+21. Data Analysis
+21.1 Sales by Month
+result = con.execute("""
+    SELECT
+        d.year,
+        d.month,
+        SUM(f.sales_amount) AS total_sales
 
-Data Warehouse ประกอบด้วย 11 Final Tables
+    FROM fact_sales f
 
-Dimension Tables — 7 Tables
+    JOIN dim_date d
+        ON f.date_id = d.date_id
 
-dim_date
-dim_product
-dim_customer
-dim_store
-dim_promotion
-dim_supplier
-dim_employee
+    GROUP BY
+        d.year,
+        d.month
 
-Fact Tables — 4 Tables
+    ORDER BY
+        d.year,
+        d.month
+""").df()
 
-fact_sales
-fact_return
-fact_shipments
-fact_payments
+display(result)
+21.2 Sales by Category
+result = con.execute("""
+    SELECT
+        c.category_name,
+        SUM(f.sales_amount) AS total_sales
 
-โดย dim_employee ถูกจัดเก็บใน Data Warehouse แต่ไม่ได้เชื่อมกับ Fact Tables ใน Star Schema หลัก เนื่องจาก Source Data ไม่มี Relationship ที่เหมาะสมสำหรับเชื่อม Employee กับ Transaction โดยตรง
-```
-# สรุปกระบวนการ ELT
+    FROM fact_sales f
 
-กระบวนการ ELT ของ Retail Data Warehouse เริ่มจาก Extract โดยนำข้อมูลจากไฟล์ CSV จำนวน 12 ตารางเข้าสู่กระบวนการด้วย Python และ Pandas จากนั้นทำ Load ข้อมูลเข้าสู่ DuckDB ในรูปแบบ Staging Tables เพื่อใช้เป็นพื้นที่จัดเก็บและตรวจสอบข้อมูลก่อนการแปลง
+    JOIN dim_category c
+        ON f.category_id = c.category_id
 
-ในขั้นตอน Transform มีการทำความสะอาดและตรวจสอบคุณภาพข้อมูล เช่น Missing Values, Duplicate Records, Primary Key, Foreign Key และ Data Types รวมถึงการ JOIN ข้อมูลจากหลายตารางและคำนวณข้อมูลที่จำเป็น เช่น sales_amount เพื่อสร้าง Dimension และ Fact Tables
+    GROUP BY
+        c.category_name
 
-ผลลัพธ์สุดท้ายคือ Data Warehouse ที่ประกอบด้วย 7 Dimension Tables ได้แก่ Dim_Date, Dim_Product, Dim_Customer, Dim_Store, Dim_Promotion, Dim_Supplier และ Dim_Employee และ 4 Fact Tables ได้แก่ Fact_Sales, Fact_Return, Fact_Shipments และ Fact_Payments โดยมีโครงสร้างเป็น Multiple Star Schema / Fact Constellation เพื่อรองรับการวิเคราะห์ข้อมูลทางธุรกิจในหลายมิติ
+    ORDER BY
+        total_sales DESC
+""").df()
 
-โดยรวมกระบวนการสามารถสรุปได้เป็น:
+display(result)
+21.3 Sales by Store
+result = con.execute("""
+    SELECT
+        s.store_id,
+        s.city,
+        SUM(f.sales_amount) AS total_sales
 
-CSV Source → Extract → DuckDB Staging → Cleaning & Validation → Transform → Dimension & Fact Tables → Data Warehouse → Data Analysis
+    FROM fact_sales f
 
+    JOIN dim_store s
+        ON f.store_id = s.store_id
+
+    GROUP BY
+        s.store_id,
+        s.city
+
+    ORDER BY
+        total_sales DESC
+""").df()
+
+display(result)
+22. Final Data Warehouse Summary
+Layer	Type	Number
+Source	CSV Tables	12
+Data Warehouse	Dimension Tables	8
+Data Warehouse	Fact Tables	4
+Data Warehouse	Total Final Tables	12
+Dimension Summary
+Dimension	Key
+dim_date	date_id
+dim_product	product_id
+dim_category	category_id
+dim_customer	customer_id
+dim_store	store_id
+dim_promotion	promotion_id
+dim_supplier	supplier_id
+dim_employee	employee_id
+Fact Summary
+Fact	Grain
+fact_sales	1 Order Line Item
+fact_return	1 Return Transaction
+fact_shipments	1 Shipment
+fact_payments	1 Payment Transaction
+23. Final Architecture
+┌──────────────────────────────┐
+│       GitHub Repository      │
+│                              │
+│        12 CSV Tables         │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│           dbt Seed           │
+│                              │
+│         Load Source          │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│            DuckDB            │
+│                              │
+│       Seed / Source Data     │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│        dbt Staging           │
+│                              │
+│       Cleaning               │
+│       Validation             │
+│       Data Type              │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│         dbt Models           │
+│                              │
+│      Transformation          │
+│      JOIN / Calculation      │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│       Data Warehouse         │
+│                              │
+│    8 Dimension Tables        │
+│    4 Fact Tables             │
+└──────────────┬───────────────┘
+               │
+               ▼
+┌──────────────────────────────┐
+│        BI / Analytics        │
+│                              │
+│      SQL Analysis            │
+│      Reports / Dashboard     │
+│      Data Analysis           │
+└──────────────────────────────┘
+24. Conclusion
+
+โปรเจกต์ Retail Data Warehouse ใช้แนวทาง ELT โดยจัดเก็บ Source Data จำนวน 12 ตารางไว้ใน GitHub Repository จากนั้นใช้ dbt Seed ในการ Load ข้อมูลเข้าสู่ DuckDB และใช้ dbt Models ในการทำ Cleaning, Validation และ Transformation
+
+ข้อมูลที่ผ่านกระบวนการดังกล่าวถูกจัดโครงสร้างเป็น Data Warehouse จำนวน 12 ตาราง ประกอบด้วย 8 Dimension Tables และ 4 Fact Tables ได้แก่ dim_date, dim_product, dim_category, dim_customer, dim_store, dim_promotion, dim_supplier, dim_employee, fact_sales, fact_return, fact_shipments และ fact_payments
+
+Data Warehouse ที่ได้สามารถนำไปใช้สำหรับ SQL Analysis, Reports, Dashboard และ Business Analytics ต่อไปได้
 ## Dashboard Link
 https://dadamini-project-aj-perm-manifest-get-a.streamlit.app/
 # Infographic
