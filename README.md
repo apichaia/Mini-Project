@@ -946,7 +946,7 @@ GitHub Repository
 4. Source Data
 Source Data ประกอบด้วย CSV จำนวน 12 ตาราง โดยมีรายละเอียดโครงสร้างและประเภทข้อมูลดังนี้
 
-ล| ลำดับ | ตาราง | Records | Columns | ประเภทข้อมูล |
+| ลำดับ | ตาราง | Records | Columns | ประเภทข้อมูล |
 | :---: | :--- | :---: | :---: | :---: |
 | 1 | employees | 1,000 | 3 | Master |
 | 2 | returns | 30,000 | 3 | Transaction |
