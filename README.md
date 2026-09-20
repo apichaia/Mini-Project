@@ -1041,6 +1041,96 @@ dbt run	Transform ข้อมูลผ่าน dbt Models
 dbt test	ตรวจสอบคุณภาพข้อมูล (Data Quality Check)
 dbt build	(แนะนำ) Run ทุกกระบวนการ (Seed, Run, Test) ตามลำดับ Dependency
 ```
+
+
+สรุปกระบวนการพัฒนา Retail Data Warehouse
+
+โครงงานนี้พัฒนาระบบ Retail Data Warehouse เพื่อรวบรวม จัดเตรียม และจัดโครงสร้างข้อมูลสำหรับการวิเคราะห์ข้อมูลธุรกิจค้าปลีก โดยใช้แนวคิด ELT (Extract, Load, Transform) ร่วมกับ GitHub, dbt และ DuckDB ซึ่งแตกต่างจากกระบวนการ ETL ตรงที่ข้อมูลจะถูกนำเข้าสู่ฐานข้อมูลก่อน แล้วจึงดำเนินการทำความสะอาดและแปลงข้อมูลภายในระบบฐานข้อมูล
+
+1. การนำเข้าข้อมูล (Extract)
+
+ข้อมูลต้นทางของระบบอยู่ในรูปแบบ CSV จำนวน 12 ตาราง ได้แก่ employees, returns, products, suppliers, categories, promotions, stores, customers, payments, orders, order_items และ shipments
+
+ข้อมูลทั้งหมดถูกจัดเก็บไว้ใน GitHub Repository เพื่อใช้เป็นแหล่งข้อมูลต้นทางของระบบ ทำให้สามารถจัดการ Source Data และ Source Code ของโครงการไว้ใน Repository เดียวกันได้
+
+2. การโหลดข้อมูล (Load)
+
+หลังจากจัดเก็บข้อมูลบน GitHub แล้ว จะใช้ dbt Seed ในการนำไฟล์ CSV เข้าสู่ฐานข้อมูล DuckDB โดยข้อมูลจะถูกโหลดเข้ามาก่อนที่จะดำเนินการทำความสะอาดหรือ Transformation
+```
+GitHub
+   ↓
+CSV Source Data
+   ↓
+dbt Seed
+   ↓
+DuckDB
+```
+การดำเนินการในขั้นตอนนี้เป็นส่วนสำคัญของแนวคิด ELT เนื่องจากข้อมูลถูก Load เข้าสู่ Database ก่อน แล้วจึงนำไปประมวลผลในขั้นตอนถัดไป
+
+3. การทำความสะอาดและตรวจสอบข้อมูล
+
+หลังจากข้อมูลถูก Load เข้าสู่ DuckDB แล้ว จะใช้ dbt Staging Models ในการจัดเตรียมข้อมูล โดยมีการดำเนินการ เช่น การแปลงชนิดข้อมูล การจัดการค่า Null และการเตรียมข้อมูลให้เหมาะสมสำหรับการสร้าง Data Warehouse
+
+นอกจากนี้ยังใช้ dbt Tests เพื่อตรวจสอบคุณภาพข้อมูล เช่น
+
+ตรวจสอบ Primary Key ไม่ให้ซ้ำด้วย unique
+ตรวจสอบค่าที่จำเป็นไม่ให้เป็น Null ด้วย not_null
+ตรวจสอบความสัมพันธ์ระหว่างตารางด้วย relationships
+
+ดังนั้นกระบวนการทำความสะอาดและตรวจสอบข้อมูลจะเกิดขึ้น ภายใน DuckDB ผ่าน dbt แทนที่จะทำก่อนการ Load ข้อมูลเหมือนในกระบวนการ ETL
+
+4. การ Transformation
+
+เมื่อข้อมูลผ่าน Staging และ Data Quality Checks แล้ว จะใช้ dbt Models ในการ Transform ข้อมูล โดยมีการ JOIN ตาราง การคำนวณ และการจัดโครงสร้างข้อมูลให้อยู่ในรูปแบบที่เหมาะสมสำหรับ Data Warehouse
+
+ระบบแบ่งข้อมูลออกเป็น Dimension Tables และ Fact Tables
+
+ประเภท	จำนวน	ตาราง
+`-Dimension	8`	`dim_date`, `dim_product`, `dim_category`,` dim_customer`, `dim_store`, `dim_promotion`, `dim_supplier`, `dim_employee` 
+`-Fact	4`	`fact_sales`, `fact_return`, `fact_shipments`, `fact_payments`
+รวม	12	Final Data Warehouse
+
+
+5. การสร้าง Data Warehouse
+
+Data Warehouse ที่ได้มีลักษณะเป็น Multiple Star Schema หรือ Fact Constellation Schema โดยมี Fact Tables หลายตารางที่สามารถใช้ Dimension ร่วมกันได้ เช่น dim_date, dim_customer, dim_store และ dim_product
+
+สำหรับ fact_sales กำหนด Grain เป็น 1 Order Line Item และมีการคำนวณมูลค่าการขายจาก
+
+sales_amount = quantity × unit_price
+
+ข้อมูลที่ได้สามารถนำไปใช้ในการวิเคราะห์ เช่น ยอดขายตามเดือน ยอดขายตามสินค้า ยอดขายตามหมวดหมู่สินค้า และยอดขายตามสาขา
+
+6. การนำข้อมูลไปใช้งาน
+
+หลังจากสร้าง Data Warehouse แล้ว ข้อมูลสามารถนำไปใช้สำหรับ SQL Analysis, Reports และ Dashboard เพื่อสนับสนุนการวิเคราะห์ข้อมูลธุรกิจ
+
+ดังนั้น กระบวนการทั้งหมดของโครงงานสามารถสรุปได้ว่า
+```
+GitHub
+  ↓
+CSV Source Data
+  ↓
+Extract
+  ↓
+dbt Seed
+  ↓
+DuckDB
+  ↓
+Staging
+  ↓
+Cleaning + Data Quality
+  ↓
+Transformation
+  ↓
+8 Dimensions + 4 Facts
+  ↓
+Retail Data Warehouse
+  ↓
+SQL / Report / Dashboard
+
+สรุป: โครงงานนี้ใช้แนวทาง ELT โดยให้ GitHub เป็นแหล่งจัดเก็บ Source Data, ใช้ dbt เป็นเครื่องมือสำหรับ Load, Cleaning, Validation และ Transformation และใช้ DuckDB เป็น Database และ Data Warehouse ก่อนนำข้อมูลที่ผ่านการจัดโครงสร้างแล้วไปใช้สำหรับการวิเคราะห์ข้อมูลต่อไป
+```
 ## Dashboard Link
 https://dadamini-project-aj-perm-manifest-get-a.streamlit.app/
 # Infographic
