@@ -1,101 +1,101 @@
-store_id,city
-1,Pune
-2,Pune
-3,Delhi
-4,Mumbai
-5,Mumbai
-6,Mumbai
-7,Delhi
-8,Bangalore
-9,Delhi
-10,Bangalore
-11,Delhi
-12,Pune
-13,Bangalore
-14,Mumbai
-15,Pune
-16,Pune
-17,Delhi
-18,Bangalore
-19,Mumbai
-20,Mumbai
-21,Delhi
-22,Mumbai
-23,Pune
-24,Pune
-25,Delhi
-26,Pune
-27,Bangalore
-28,Mumbai
-29,Bangalore
-30,Pune
-31,Bangalore
-32,Mumbai
-33,Pune
-34,Mumbai
-35,Bangalore
-36,Delhi
-37,Mumbai
-38,Mumbai
-39,Pune
-40,Bangalore
-41,Pune
-42,Mumbai
-43,Pune
-44,Delhi
-45,Delhi
-46,Delhi
-47,Pune
-48,Mumbai
-49,Pune
-50,Pune
-51,Bangalore
-52,Mumbai
-53,Pune
-54,Mumbai
-55,Mumbai
-56,Delhi
-57,Mumbai
-58,Bangalore
-59,Bangalore
-60,Bangalore
-61,Pune
-62,Bangalore
-63,Delhi
-64,Bangalore
-65,Pune
-66,Mumbai
-67,Pune
-68,Mumbai
-69,Delhi
-70,Delhi
-71,Delhi
-72,Pune
-73,Bangalore
-74,Pune
-75,Mumbai
-76,Delhi
-77,Delhi
-78,Pune
-79,Bangalore
-80,Bangalore
-81,Delhi
-82,Mumbai
-83,Bangalore
-84,Mumbai
-85,Mumbai
-86,Mumbai
-87,Mumbai
-88,Bangalore
-89,Mumbai
-90,Mumbai
-91,Pune
-92,Pune
-93,Delhi
-94,Pune
-95,Mumbai
-96,Pune
-97,Mumbai
-98,Mumbai
-99,Bangalore
-100,Delhi
+store_id,city,region
+1,Pune,Western India 
+2,Pune,Western India
+3,Delhi,Northern India
+4,Mumbai,Western India
+5,Mumbai,Western India
+6,Mumbai,Western India
+7,Delhi,Northern India
+8,Bangalore,Southern India 
+9,Delhi,Northern India
+10,Bangalore,Southern India
+11,Delhi,Northern India
+12,Pune,Western India
+13,Bangalore,Southern India
+14,Mumbai,Western India
+15,Pune,Western India
+16,Pune,Western India
+17,Delhi,Northern India
+18,Bangalore,Southern India
+19,Mumbai,Western India
+20,Mumbai,Western India
+21,Delhi,Northern India
+22,Mumbai,Western India
+23,Pune,Western India
+24,Pune,Western India
+25,Delhi,Northern India
+26,Pune,Western India
+27,Bangalore,Southern India
+28,Mumbai,Western India
+29,Bangalore,Southern India
+30,Pune,Western India
+31,Bangalore,Southern India
+32,Mumbai,Western India
+33,Pune,Western India
+34,Mumbai,Western India
+35,Bangalore,Southern India
+36,Delhi,Northern India
+37,Mumbai,Western India
+38,Mumbai,Western India
+39,Pune,Western India
+40,Bangalore,Southern India
+41,Pune,Western India
+42,Mumbai,Western India
+43,Pune,Western India
+44,Delhi,Northern India
+45,Delhi,Northern India
+46,Delhi,Northern India
+47,Pune,Western India
+48,Mumbai,Western India
+49,Pune,Western India
+50,Pune,Western India
+51,Bangalore,Southern India
+52,Mumbai,Western India
+53,Pune,Western India
+54,Mumbai,Western India
+55,Mumbai,Western India
+56,Delhi,Northern India
+57,Mumbai,Western India
+58,Bangalore,Southern India
+59,Bangalore,Southern India
+60,Bangalore,Southern India
+61,Pune,Western India
+62,Bangalore,Southern India
+63,Delhi,Northern India
+64,Bangalore,Southern India
+65,Pune,Western India
+66,Mumbai,Western India
+67,Pune,Western India
+68,Mumbai,Western India
+69,Delhi,Northern India
+70,Delhi,Northern India
+71,Delhi,Northern India
+72,Pune,Western India
+73,Bangalore,Southern India
+74,Pune,Western India
+75,Mumbai,Western India
+76,Delhi,Northern India
+77,Delhi,Northern India
+78,Pune,Western India
+79,Bangalore,Southern India
+80,Bangalore,Southern India
+81,Delhi,Northern India
+82,Mumbai,Western India
+83,Bangalore,Southern India
+84,Mumbai,Western India
+85,Mumbai,Western India
+86,Mumbai,Western India
+87,Mumbai,Western India
+88,Bangalore,Southern India
+89,Mumbai,Western India
+90,Mumbai,Western India
+91,Pune,Western India
+92,Pune,Western India
+93,Delhi,Northern India
+94,Pune,Western India
+95,Mumbai,Western India
+96,Pune,Western India
+97,Mumbai,Western India
+98,Mumbai,Western India
+99,Bangalore,Southern India
+100,Delhi,Northern India
