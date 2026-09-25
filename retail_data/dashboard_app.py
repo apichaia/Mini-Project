@@ -1,811 +1,477 @@
-import os
-from pathlib import Path
+import streamlit as st
 import duckdb
 import pandas as pd
-import streamlit as st
-import altair as alt
+import plotly.express as px
+from pathlib import Path
 
-# --- ปลดล็อกข้อจำกัดของ Altair (ป้องกัน Error เมื่อข้อมูลเกิน 5000 บรรทัด) ---
-alt.data_transformers.disable_max_rows()
-
-# --- Page Config & Modern Styling ---
+# =========================================================
+# Page Setup & Styling
+# =========================================================
 st.set_page_config(
-    page_title="Retail Enterprise Analytics Dashboard",
-    page_icon="🛍️",
+    page_title="Retail Analytics Dashboard",
+    page_icon="📊",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="expanded"
 )
 
-st.set_page_config(
-    page_title="Retail Enterprise Analytics Dashboard",
-    page_icon="🛍️",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
+    html, body, [class*="css"] { font-family: 'Plus Jakarta Sans', sans-serif; }
+    
+    .main-header {
+        background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%);
+        padding: 20px 24px;
+        border-radius: 12px;
+        color: white;
+        margin-bottom: 20px;
+    }
+    .main-title { font-size: 1.8rem; font-weight: 700; margin: 0; }
+    .main-subtitle { font-size: 1rem; color: #94A3B8; margin-top: 8px; line-height: 1.5; }
+    
+    #MainMenu {visibility: hidden;}
+    footer {visibility: hidden;}
+    </style>
+""", unsafe_allow_html=True)
 
 PROJECT_ROOT = Path(__file__).resolve().parent
+DB_PATH = PROJECT_ROOT / "dev.duckdb"
 
-def get_dataset_dir():
-    candidates = [
-        PROJECT_ROOT / "datasets",
-        PROJECT_ROOT / "retail_data" / "datasets",
-        PROJECT_ROOT,
-        PROJECT_ROOT.parent / "datasets",
-        PROJECT_ROOT.parent / "retail_data" / "datasets",
-        Path.cwd() / "datasets",
-        Path.cwd() / "retail_data" / "datasets",
-        Path.cwd(),
-    ]
-    for candidate in candidates:
-        if candidate.exists():
-            csv_files = [f.name for f in candidate.glob("*.csv")]
-            if "orders.csv" in csv_files or "fact_sales.csv" in csv_files or "products.csv" in csv_files:
-                return candidate
-    return None
-
-@st.cache_data
-def load_full_dataset():
-    dataset_dir = get_dataset_dir()
-    if not dataset_dir:
-        return pd.DataFrame(), pd.DataFrame()
-
-    con = duckdb.connect(":memory:")
-
-    # 1. โหลดไฟล์ CSV ทั้งหมดเข้า DuckDB
-    for fpath in dataset_dir.glob("*.csv"):
-        tname = fpath.stem.lower()
-        p_str = str(fpath).replace("\\", "/")
-        con.execute(f"CREATE TABLE IF NOT EXISTS {tname} AS SELECT * FROM read_csv_auto('{p_str}')")
-
-    existing_tables = [r[0].lower() for r in con.execute("SHOW TABLES").fetchall()]
-
-    def get_cols(tname):
-        if tname in [r[0].lower() for r in con.execute("SHOW TABLES").fetchall()]:
-            return [r[1].lower() for r in con.execute(f"PRAGMA table_info('{tname}')").fetchall()]
-        return []
-
-    def map_table(target_name, candidate_names):
-        if target_name in existing_tables:
-            return
-        for cand in candidate_names:
-            if cand in existing_tables:
-                con.execute(f"CREATE TABLE {target_name} AS SELECT * FROM {cand}")
-                existing_tables.append(target_name)
-                return
-
-    map_table("dim_customer", ["customers", "customer"])
-    map_table("dim_store", ["stores", "store"])
-    map_table("dim_product", ["products", "product"])
-    map_table("dim_promotion", ["promotions", "promotion"])
-    map_table("dim_supplier", ["suppliers", "supplier"])
-    map_table("dim_category", ["categories", "category"])
-    map_table("fact_return", ["returns", "return", "fact_returns"])
-    map_table("fact_payments", ["payments", "payment"])
-    map_table("fact_shipments", ["shipments", "shipment"])
-    map_table("employees", ["dim_employee", "employee"])
-
-    def ensure_table(tname, columns_def):
-        if tname not in [r[0].lower() for r in con.execute("SHOW TABLES").fetchall()]:
-            con.execute(f"CREATE TABLE {tname} ({columns_def})")
-
-    ensure_table("orders", "order_id INT, order_date DATE, date_id INT, customer_id INT, store_id INT, promotion_id INT")
-    ensure_table("dim_date", "date_id INT, year INT, month INT, day INT")
-    ensure_table("dim_product", "product_id INT, category_id INT, supplier_id INT, price DOUBLE, product_name VARCHAR")
-    ensure_table("dim_category", "category_id INT, category_name VARCHAR")
-    ensure_table("dim_supplier", "supplier_id INT, supplier_name VARCHAR, country VARCHAR")
-    ensure_table("dim_store", "store_id INT, store_name VARCHAR, city VARCHAR")
-    ensure_table("dim_customer", "customer_id INT, customer_name VARCHAR, city VARCHAR, signup_date DATE")
-    ensure_table("dim_promotion", "promotion_id INT, promotion_name VARCHAR, discount DOUBLE")
-    ensure_table("fact_return", "order_items_id INT, refund DOUBLE")
-    ensure_table("fact_shipments", "order_id INT, status VARCHAR")
-    ensure_table("fact_payments", "order_id INT, amount DOUBLE")
-    ensure_table("employees", "employee_id INT, store_id INT, salary DOUBLE")
-
-    def ensure_column(table, col, col_type, default_val="NULL"):
-        if table in [r[0].lower() for r in con.execute("SHOW TABLES").fetchall()]:
-            cols = [r[1].lower() for r in con.execute(f"PRAGMA table_info('{table}')").fetchall()]
-            if col.lower() not in cols:
-                con.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type} DEFAULT {default_val}")
-
-    ensure_column("orders", "date_id", "INT", "0")
-    ensure_column("orders", "promotion_id", "INT", "0")
-    ensure_column("orders", "customer_id", "INT", "0")
-    ensure_column("orders", "store_id", "INT", "0")
-    ensure_column("orders", "order_date", "DATE", "NULL")
-    ensure_column("dim_product", "supplier_id", "INT", "0")
-    ensure_column("dim_product", "price", "DOUBLE", "0.0")
-
-    orders_cols = get_cols("orders")
-    if "date_id" in orders_cols:
-        date_id_expr = "COALESCE(o.date_id, 0)"
-    elif "order_date" in orders_cols:
-        date_id_expr = "COALESCE(TRY_CAST(strftime(TRY_CAST(o.order_date AS DATE), '%Y%m%d') AS INT), 0)"
-    else:
-        date_id_expr = "0"
-
-    if "fact_sales" not in [r[0].lower() for r in con.execute("SHOW TABLES").fetchall()]:
-        if "orders" in existing_tables and "order_items" in existing_tables:
-            oi_cols = get_cols("order_items")
-            
-            if "order_item_id" in oi_cols:
-                oi_id_sql = "oi.order_item_id"
-            elif "order_items_id" in oi_cols:
-                oi_id_sql = "oi.order_items_id"
-            else:
-                oi_id_sql = "ROW_NUMBER() OVER()"
-
-            if "quantity" in oi_cols:
-                oi_qty_sql = "oi.quantity"
-            elif "qty" in oi_cols:
-                oi_qty_sql = "oi.qty"
-            else:
-                oi_qty_sql = "0"
-
-            if "unit_price" in oi_cols:
-                oi_price_sql = "oi.unit_price"
-            elif "price" in oi_cols:
-                oi_price_sql = "oi.price"
-            else:
-                oi_price_sql = "p.price"
-
-            con.execute(f"""
-                CREATE TABLE fact_sales AS
-                SELECT 
-                    {oi_id_sql} AS order_items_id,
-                    o.order_id,
-                    {date_id_expr} AS date_id,
-                    oi.product_id,
-                    o.customer_id,
-                    o.store_id,
-                    COALESCE(o.promotion_id, 0) AS promotion_id,
-                    COALESCE(p.supplier_id, 0) AS supplier_id,
-                    COALESCE({oi_qty_sql}, 0) AS quantity,
-                    COALESCE({oi_price_sql}, p.price, 0.0) AS unit_price,
-                    COALESCE({oi_qty_sql}, 0) * COALESCE({oi_price_sql}, p.price, 0.0) AS sales_amount,
-                    0.0 AS discount
-                FROM order_items oi
-                LEFT JOIN orders o ON oi.order_id = o.order_id
-                LEFT JOIN dim_product p ON oi.product_id = p.product_id
-            """)
-        else:
-            con.execute("""
-                CREATE TABLE fact_sales AS 
-                SELECT 1 AS order_items_id, 1 AS order_id, 1 AS date_id, 1 AS product_id, 
-                       1 AS customer_id, 1 AS store_id, 1 AS promotion_id, 1 AS supplier_id, 
-                       0 AS quantity, 0.0 AS unit_price, 0.0 AS sales_amount, 0.0 AS discount WHERE 1=0
-            """)
-
-    ensure_column("fact_sales", "quantity", "INT", "0")
-    ensure_column("fact_sales", "unit_price", "DOUBLE", "0.0")
-    ensure_column("fact_sales", "sales_amount", "DOUBLE", "0.0")
-    ensure_column("fact_sales", "discount", "DOUBLE", "0.0")
-    ensure_column("fact_shipments", "status", "VARCHAR", "'Pending'")
-    ensure_column("fact_return", "refund", "DOUBLE", "0.0")
-    ensure_column("fact_payments", "amount", "DOUBLE", "0.0")
-    ensure_column("dim_supplier", "country", "VARCHAR", "'Unknown Country'")
-    ensure_column("dim_store", "city", "VARCHAR", "'Unknown Store City'")
-    ensure_column("dim_customer", "city", "VARCHAR", "'Unknown Customer City'")
-    ensure_column("dim_customer", "signup_date", "DATE", "NULL")
-    ensure_column("dim_promotion", "discount", "DOUBLE", "0.0")
-    ensure_column("employees", "salary", "DOUBLE", "0.0")
-    ensure_column("employees", "store_id", "INT", "0")
-
-    prod_cols = get_cols("dim_product")
-    prod_name_sql = "dp.product_name" if "product_name" in prod_cols else ("dp.name" if "name" in prod_cols else "'Product #' || CAST(COALESCE(s.product_id, 0) AS VARCHAR)")
+# =========================================================
+# 1. Database ETL Initialization
+# =========================================================
+@st.cache_resource
+def init_database():
+    conn = duckdb.connect(str(DB_PATH))
     
-    cat_cols = get_cols("dim_category")
-    cat_name_sql = "dcat.category_name" if "category_name" in cat_cols else ("dcat.name" if "name" in cat_cols else ("dp.category_name" if "category_name" in prod_cols else "'Category #' || CAST(COALESCE(dp.category_id, 0) AS VARCHAR)"))
+    def recreate_table(table_name, select_sql):
+        try:
+            conn.execute(f'CREATE OR REPLACE TABLE main."{table_name}" AS {select_sql};')
+        except Exception:
+            pass
 
-    sup_cols = get_cols("dim_supplier")
-    sup_name_sql = "dsup.supplier_name" if "supplier_name" in sup_cols else ("dsup.name" if "name" in sup_cols else "'Supplier #' || CAST(COALESCE(s.supplier_id, 0) AS VARCHAR)")
+    def get_csv_path(filename):
+        paths_to_check = [
+            PROJECT_ROOT.parent / "datasets" / filename,
+            PROJECT_ROOT / "datasets" / filename,
+            PROJECT_ROOT / filename
+        ]
+        for p in paths_to_check:
+            if p.exists():
+                return p.as_posix()
+        return None
 
-    store_cols = get_cols("dim_store")
-    store_name_sql = "dstr.store_name" if "store_name" in store_cols else ("dstr.name" if "name" in store_cols else "'Store #' || CAST(COALESCE(s.store_id, 0) AS VARCHAR)")
-    emp_store_name_sql = "dstr.store_name" if "store_name" in store_cols else ("dstr.name" if "name" in store_cols else "'Store #' || CAST(COALESCE(e.store_id, 0) AS VARCHAR)")
+    csv_mapping = {
+        "categories.csv": "stg_categories", "customers.csv": "stg_customers",
+        "employees.csv": "stg_employees", "order_items.csv": "stg_order_items",
+        "orders.csv": "stg_orders", "payments.csv": "stg_payments",
+        "products.csv": "stg_products", "promotions.csv": "stg_promotions",
+        "returns.csv": "stg_returns", "shipments.csv": "stg_shipments",
+        "stores.csv": "stg_stores", "suppliers.csv": "stg_suppliers"
+    }
+    
+    for csv_file, table_name in csv_mapping.items():
+        found_path = get_csv_path(csv_file)
+        if found_path:
+            recreate_table(table_name, f"SELECT * FROM read_csv_auto('{found_path}')")
 
-    cust_cols = get_cols("dim_customer")
-    cust_name_sql = "dc.customer_name" if "customer_name" in cust_cols else ("dc.name" if "name" in cust_cols else "'Customer #' || CAST(COALESCE(s.customer_id, 0) AS VARCHAR)")
+    dim_mappings = {
+        "dim_category": "stg_categories", "dim_customer": "stg_customers",
+        "dim_employee": "stg_employees", "dim_product": "stg_products",
+        "dim_promotion": "stg_promotions", "dim_store": "stg_stores",
+        "dim_supplier": "stg_suppliers", "dim_payment": "stg_payments",
+    }
+    for dim_table, stg_table in dim_mappings.items():
+        recreate_table(dim_table, f'SELECT * FROM main."{stg_table}"')
 
-    promo_cols = get_cols("dim_promotion")
-    promo_name_sql = "dpro.promotion_name" if "promotion_name" in promo_cols else ("dpro.name" if "name" in promo_cols else "CASE WHEN s.promotion_id IS NULL OR s.promotion_id = 0 THEN 'ไม่มีโปรโมชัน' ELSE 'Promo #' || CAST(s.promotion_id AS VARCHAR) END")
+    recreate_table("fact_returns", 'SELECT * FROM main.stg_returns')
+    recreate_table("fact_sales", """
+        SELECT 
+            oi.order_item_id, oi.order_id, oi.product_id,
+            oi.qty AS units_sold, oi.price AS unit_price,
+            (oi.qty * oi.price) AS revenue,
+            o.customer_id, o.store_id, o.promotion_id, o.order_date
+        FROM main.stg_order_items oi
+        LEFT JOIN main.stg_orders o ON oi.order_id = o.order_id
+    """)
+    conn.close()
 
-    ret_cols = get_cols("fact_return")
-    ret_id_sql = "order_item_id" if "order_item_id" in ret_cols else ("order_items_id" if "order_items_id" in ret_cols else "order_id")
+init_database()
 
+def run_query(query):
     try:
-        query_main = f"""
-            WITH base_sales AS (
-                SELECT 
-                    fs.order_id,
-                    COALESCE(fs.order_items_id, ROW_NUMBER() OVER()) AS order_items_id,
-                    fs.date_id,
-                    fs.product_id,
-                    fs.customer_id,
-                    fs.store_id,
-                    fs.promotion_id,
-                    fs.supplier_id,
-                    COALESCE(fs.quantity, 0) AS quantity,
-                    COALESCE(fs.unit_price, 0.0) AS unit_price,
-                    COALESCE(fs.sales_amount, COALESCE(fs.quantity, 0) * COALESCE(fs.unit_price, 0.0)) AS sales_amount,
-                    COALESCE(fs.discount, 0.0) AS discount_amount
-                FROM fact_sales fs
-            )
-            SELECT 
-                s.order_id,
-                s.order_items_id AS order_item_id,
-                s.product_id,
-                s.customer_id,
-                s.store_id,
-                s.promotion_id,
-                s.supplier_id,
-                
-                CASE 
-                    WHEN dd.year IS NOT NULL AND dd.month IS NOT NULL AND dd.day IS NOT NULL 
-                    THEN TRY_CAST(MAKE_DATE(CAST(dd.year AS INT), CAST(dd.month AS INT), CAST(dd.day AS INT)) AS DATE)
-                    WHEN o.order_date IS NOT NULL THEN TRY_CAST(o.order_date AS DATE)
-                    ELSE CURRENT_DATE
-                END AS order_date,
-
-                s.quantity,
-                s.unit_price,
-                s.sales_amount AS revenue,
-                s.discount_amount,
-
-                COALESCE({prod_name_sql}, 'Product #' || CAST(COALESCE(s.product_id, 0) AS VARCHAR)) AS product_name,
-                COALESCE({cat_name_sql}, 'Category #' || CAST(COALESCE(dp.category_id, 0) AS VARCHAR)) AS category_name,
-                COALESCE({sup_name_sql}, 'Supplier #' || CAST(COALESCE(s.supplier_id, 0) AS VARCHAR)) AS supplier_name,
-                COALESCE(dsup.country, 'Unknown Country') AS supplier_country,
-
-                COALESCE({store_name_sql}, 'Store #' || CAST(COALESCE(s.store_id, 0) AS VARCHAR)) AS store_name,
-                COALESCE(dstr.city, 'Unknown Store City') AS store_city,
-
-                COALESCE({cust_name_sql}, 'Customer #' || CAST(COALESCE(s.customer_id, 0) AS VARCHAR)) AS customer_name,
-                COALESCE(dc.city, 'Unknown Customer City') AS customer_city,
-                CAST(dc.signup_date AS DATE) AS customer_signup_date,
-
-                COALESCE(dpro.discount, 0.0) AS discount_rate,
-                COALESCE({promo_name_sql}, 'ไม่มีโปรโมชัน') AS promotion_name,
-
-                COALESCE(ret.refund_total, 0.0) AS refund_amount,
-                COALESCE(ret.return_count, 0) > 0 AS is_returned,
-
-                COALESCE(shp.status, 'Pending') AS shipment_status,
-                COALESCE(pay.total_payment, 0.0) AS total_payment
-            FROM base_sales s
-            LEFT JOIN orders o ON s.order_id = o.order_id
-            LEFT JOIN dim_date dd ON s.date_id = dd.date_id
-            LEFT JOIN dim_product dp ON s.product_id = dp.product_id
-            LEFT JOIN dim_category dcat ON dp.category_id = dcat.category_id
-            LEFT JOIN dim_supplier dsup ON s.supplier_id = dsup.supplier_id
-            LEFT JOIN dim_store dstr ON s.store_id = dstr.store_id
-            LEFT JOIN dim_customer dc ON s.customer_id = dc.customer_id
-            LEFT JOIN dim_promotion dpro ON s.promotion_id = dpro.promotion_id
-            LEFT JOIN (
-                SELECT {ret_id_sql} AS ret_item_id, COUNT(*) AS return_count, SUM(refund) AS refund_total
-                FROM fact_return
-                GROUP BY {ret_id_sql}
-            ) ret ON s.order_items_id = ret.ret_item_id
-            LEFT JOIN (
-                SELECT order_id, FIRST(status) AS status
-                FROM fact_shipments
-                GROUP BY order_id
-            ) shp ON s.order_id = shp.order_id
-            LEFT JOIN (
-                SELECT order_id, SUM(amount) AS total_payment 
-                FROM fact_payments 
-                GROUP BY order_id
-            ) pay ON s.order_id = pay.order_id
-        """
-
-        query_employees = f"""
-            SELECT 
-                e.employee_id,
-                e.store_id,
-                e.salary,
-                COALESCE(dstr.city, 'Unknown Store City') AS store_city,
-                COALESCE({emp_store_name_sql}, 'Store #' || CAST(e.store_id AS VARCHAR)) AS store_name
-            FROM employees e
-            LEFT JOIN dim_store dstr ON e.store_id = dstr.store_id
-        """
-
-        df_main = con.execute(query_main).fetchdf()
-        df_emp = con.execute(query_employees).fetchdf()
-
-        return process_dataframe(df_main), df_emp
-    except Exception as e:
-        st.error(f"Error executing DuckDB Query: {e}")
-        return pd.DataFrame(), pd.DataFrame()
-    finally:
-        con.close()
-
-def process_dataframe(df):
-    if df.empty:
+        conn = duckdb.connect(str(DB_PATH), read_only=True)
+        df = conn.execute(query).fetch_df()
+        conn.close()
         return df
-    df["order_date"] = pd.to_datetime(df["order_date"], errors="coerce")
-    df = df.dropna(subset=["order_date"]).copy()
-    df["year"] = df["order_date"].dt.year
-    df["year_month"] = df["order_date"].dt.strftime("%Y-%m")
-    df["month_name"] = df["order_date"].dt.strftime("%Y-%m (%B)")
-    df["quarter_label"] = df["order_date"].dt.year.astype(str) + "-Q" + df["order_date"].dt.quarter.astype(str)
-    df["date_label"] = df["order_date"].dt.strftime("%Y-%m-%d")
-    df["day_name"] = df["order_date"].dt.strftime("%A")
-    if "customer_signup_date" in df.columns:
-        df["signup_year"] = pd.to_datetime(df["customer_signup_date"], errors="coerce").dt.year.fillna(0).astype(int)
-    if "shipment_status" in df.columns:
-        df["shipment_status"] = df["shipment_status"].astype(str).str.title()
-    
-    if "store_name" in df.columns and "store_city" in df.columns:
-        df["store_label"] = df["store_name"] + " (" + df["store_city"] + ")"
-    else:
-        df["store_label"] = "Store #" + df["store_id"].astype(str)
+    except Exception:
+        return pd.DataFrame()
 
-    df["is_promo"] = df["promotion_id"].apply(lambda x: "มีโปรโมชัน" if pd.notnull(x) and x > 0 else "ไม่มีโปรโมชัน")
+# =========================================================
+# 2. Data Loading & Data Cleaning
+# =========================================================
+@st.cache_data(ttl=600)
+def load_dashboard_data():
+    query = """
+        SELECT 
+            s.order_item_id, s.order_id, s.order_date, s.units_sold, s.revenue,
+            COALESCE(TRIM(st.region), 'Unspecified') AS region,
+            s.customer_id, COALESCE(TRIM(c.city), 'Unspecified') AS customer_city,
+            s.product_id, COALESCE(TRIM(cat.category_name), 'Unspecified') AS category,
+            COALESCE(CAST(p.discount AS VARCHAR) || '% Discount', 'No Discount') AS promotion_name,
+            COALESCE(TRIM(sup.country), 'Unspecified') AS supplier_country,
+            COALESCE(r.refund, 0) AS refund_amount
+        FROM main.fact_sales s
+        LEFT JOIN main.dim_store st ON s.store_id = st.store_id
+        LEFT JOIN main.dim_customer c ON s.customer_id = c.customer_id
+        LEFT JOIN main.dim_product pr ON s.product_id = pr.product_id
+        LEFT JOIN main.dim_category cat ON pr.category_id = cat.category_id
+        LEFT JOIN main.dim_promotion p ON s.promotion_id = p.promotion_id
+        LEFT JOIN main.dim_supplier sup ON pr.supplier_id = sup.supplier_id
+        LEFT JOIN main.fact_returns r ON s.order_item_id = r.order_item_id
+    """
+    df = run_query(query)
+    if not df.empty:
+        df['region'] = df['region'].str.strip()
+        df['category'] = df['category'].str.strip()
+        df['customer_city'] = df['customer_city'].str.strip()
+        df['supplier_country'] = df['supplier_country'].str.strip()
 
+        df['order_date'] = pd.to_datetime(df['order_date'], errors='coerce')
+        df['Year'] = df['order_date'].dt.year.fillna(0).astype(int).astype(str)
+        df['Quarter'] = 'Q' + df['order_date'].dt.quarter.fillna(0).astype(int).astype(str)
+        df['Month'] = df['order_date'].dt.to_period('M').astype(str)
+        df['Year_Q'] = df['Year'] + "-" + df['Quarter']
     return df
 
-def main():
-    st.title("🛍️ Retail Enterprise Analytics Dashboard")
-    st.caption("ระบบวิเคราะห์เชิงลึกข้อมูลการขาย สิทธิประโยชน์ ลูกค้า และห่วงโซ่อุปทาน (Enterprise Business Intelligence)")
+df_raw = load_dashboard_data()
 
-    df, df_emp = load_full_dataset()
-    if df.empty:
-        st.warning("⚠️ ไม่พบข้อมูลไฟล์ CSV ในโฟลเดอร์ที่กำหนด กรุณาตรวจสอบ Data Source")
-        st.stop() # หยุดการทำงานแทนการใช้ return
+if df_raw.empty:
+    st.error("⚠️ ไม่พบข้อมูลในระบบ")
+    st.stop()
 
-    st.sidebar.header("🔍 ตัวกรองข้อมูล (Filters)")
-    min_d, max_d = df["order_date"].min().date(), df["order_date"].max().date()
+# Theme Settings
+px.defaults.template = "plotly_white"
+COLOR_PALETTE = ["#6366F1", "#0EA5E9", "#10B981", "#F59E0B", "#EC4899", "#8B5CF6"]
+px.defaults.color_discrete_sequence = COLOR_PALETTE
 
-    # จัดการกรณีที่ผู้ใช้คลิกเลือกแค่วันเริ่มต้นวันเดียว
-    date_input = st.sidebar.date_input(
-        "ช่วงวันที่", 
-        value=(min_d, max_d),
-        min_value=min_d, 
-        max_value=max_d
-    )
-    
-    if len(date_input) == 2:
-        start_d, end_d = date_input
+def sort_categories(cat_list):
+    def extract_num(val):
+        nums = [int(s) for s in val.split('_') if s.isdigit()]
+        return nums[0] if nums else 999
+    return sorted(cat_list, key=extract_num)
+
+# =========================================================
+# 3. Main Header & High-Level Metrics
+# =========================================================
+st.markdown("""
+    <div class="main-header">
+        <div class="main-title">📈 Retail Analytics Dashboard (ระบบวิเคราะห์ข้อมูลการขายปลีก)</div>
+        <div class="main-subtitle">
+           ระบบวิเคราะห์เชิงลึกข้อมูลการขาย สิทธิประโยชน์ ลูกค้า และห่วงโซ่อุปทาน (Enterprise Business Intelligence)
+""", unsafe_allow_html=True)
+
+# ฟังก์ชันสำหรับย่อตัวเลข (M = หลักล้าน, K = หลักพัน)
+def format_metric(num):
+    if num >= 1_000_000:
+        return f"{num / 1_000_000:.2f}M"
+    elif num >= 1_000:
+        return f"{num / 1_000:.1f}K"
     else:
-        start_d = end_d = date_input[0]
+        return f"{num:,.0f}"
 
-    cities = st.sidebar.multiselect(
-        "สาขาตามเมือง (Store City)",
-        options=sorted(df["store_city"].dropna().unique()),
-        default=df["store_city"].dropna().unique(),
-    )
-    categories = st.sidebar.multiselect(
-        "หมวดหมู่สินค้า",
-        options=sorted(df["category_name"].dropna().unique()),
-        default=df["category_name"].dropna().unique(),
-    )
+tot_rev = df_raw['revenue'].sum()
+tot_ord = df_raw['order_id'].nunique()
+tot_units = df_raw['units_sold'].sum()
+aov_val = tot_rev / tot_ord if tot_ord > 0 else 0
+tot_cust = df_raw['customer_id'].nunique()
+tot_ref = df_raw['refund_amount'].sum()
 
-    df_filtered = df[
-        (df["order_date"].dt.date >= start_d)
-        & (df["order_date"].dt.date <= end_d)
-        & (df["store_city"].isin(cities))
-        & (df["category_name"].isin(categories))
-    ]
+m1, m2, m3, m4, m5, m6 = st.columns(6)
+m1.metric("Revenue", f"${format_metric(tot_rev)}")
+m2.metric("Orders", f"{format_metric(tot_ord)}")
+m3.metric("Units Sold", f"{format_metric(tot_units)}")
+m4.metric("AOV", f"${format_metric(aov_val)}")
+m5.metric("Active Customers", f"{format_metric(tot_cust)}")
+m6.metric("Total Refunds", f"${format_metric(tot_ref)}")
 
-    if df_filtered.empty:
-        st.info("💡 ไม่มีข้อมูลตรงกับเงื่อนไขตัวกรองที่เลือก กรุณาปรับช่วงเวลาหรือตัวกรองอื่นๆ")
-        st.stop() # หยุดการทำงานแทนการใช้ return
+st.markdown("<br>", unsafe_allow_html=True)
 
-    df_emp_filtered = df_emp[df_emp["store_city"].isin(cities)] if not df_emp.empty else pd.DataFrame()
+# Master Filter Options
+all_regions = ["ทั้งหมด (All Regions)"] + sorted(df_raw['region'].unique().tolist())
+all_years = ["ทุกปี (All Years)"] + sorted(df_raw['Year'].unique().tolist())
+all_countries = ["ทุกประเทศ (All)"] + sorted(df_raw['supplier_country'].unique().tolist())
+all_cities = sorted(df_raw['customer_city'].unique().tolist())
+all_cats_sorted = sort_categories(df_raw['category'].unique().tolist())
 
-    rev = df_filtered["revenue"].sum()
-    orders = df_filtered["order_id"].nunique()
-    qty = df_filtered["quantity"].sum()
-    refunds = df_filtered["refund_amount"].sum()
-    overall_aov = (rev / orders) if orders > 0 else 0
+# =========================================================
+# 4. Core Business Domain Tabs
+# =========================================================
+tab1, tab2, tab3, tab4 = st.tabs([
+    "📊 Revenue Trends",
+    "👥 Customer Insights",
+    "📦 Product Performance",
+    "🚚 Supply Chain"
+])
 
-    cust_orders = df_filtered.groupby("customer_id")["order_id"].nunique()
-    total_customers = len(cust_orders)
-    repeat_customers = (cust_orders > 1).sum()
-    repeat_rate = (repeat_customers / total_customers * 100) if total_customers > 0 else 0
+# ---------------------------------------------------------
+# TAB 1: Sales, Revenue & Growth
+# ---------------------------------------------------------
+with tab1:
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("##### 📌 Monthly Revenue Trend")
+        f_reg1 = st.selectbox("เลือกภูมิภาค:", all_regions, key="sb_t1_c1")
+        df_c1 = df_raw.copy()
+        if f_reg1 != "ทั้งหมด (All Regions)":
+            df_c1 = df_c1[df_c1['region'] == f_reg1]
+            
+        q1 = df_c1.groupby(['Month', 'region'])['revenue'].sum().reset_index()
+        fig1 = px.line(q1, x='Month', y='revenue', color='region', markers=True, title="Monthly Revenue")
+        fig1.update_layout(hovermode="x unified", margin=dict(l=20, r=20, t=40, b=20), yaxis_tickprefix="$")
+        st.plotly_chart(fig1, width="stretch")
 
-    k1, k2, k3, k4, k5, k6 = st.columns(6)
-    k1.metric("ยอดขายรวม (Revenue)", f"${rev:,.0f}")
-    k2.metric("จำนวนคำสั่งซื้อ", f"{orders:,.0f}")
-    k3.metric("ยอดขายเฉลี่ย/คำสั่งซื้อ (AOV)", f"${overall_aov:,.2f}")
-    k4.metric("สินค้าที่ขายได้", f"{qty:,.0f} ชิ้น")
-    k5.metric("อัตราซื้อซ้ำ (Repeat Rate)", f"{repeat_rate:.1f}%")
-    k6.metric("ยอดคืนเงินรวม (Refunds)", f"${refunds:,.0f}")
+    with col2:
+        st.markdown("##### 📌 Annual Revenue Breakdown")
+        f_reg2 = st.selectbox("เลือกภูมิภาค:", all_regions, key="sb_t1_c2")
+        df_c2 = df_raw.copy()
+        if f_reg2 != "ทั้งหมด (All Regions)":
+            df_c2 = df_c2[df_c2['region'] == f_reg2]
+            
+        q2 = df_c2.groupby(['Year', 'region'])['revenue'].sum().reset_index()
+        fig2 = px.bar(q2, x='Year', y='revenue', color='region', barmode='group', text_auto='.2s', title="Annual Revenue")
+        fig2.update_traces(textposition="outside")
+        fig2.update_layout(margin=dict(l=20, r=20, t=40, b=20), yaxis_tickprefix="$")
+        st.plotly_chart(fig2, width="stretch")
 
-    st.markdown("---")
+    col3, col4 = st.columns(2)
+    with col3:
+        st.markdown("##### 📌 Quarterly Revenue")
+        f_yr3 = st.selectbox("เลือกปี:", all_years, key="sb_t1_c3")
+        df_c3 = df_raw.copy()
+        if f_yr3 != "ทุกปี (All Years)":
+            df_c3 = df_c3[df_c3['Year'] == f_yr3]
+            
+        q3 = df_c3.groupby(['Year_Q', 'region'])['revenue'].sum().reset_index()
+        fig3 = px.bar(q3, x='Year_Q', y='revenue', color='region', barmode='group', title="Quarterly Revenue")
+        fig3.update_layout(margin=dict(l=20, r=20, t=40, b=20), yaxis_tickprefix="$")
+        st.plotly_chart(fig3, width="stretch")
 
-    t1, t2, t3, t4, t5, t6 = st.tabs([
-        "📈 ยอดขาย & แนวโน้มการเติบโต",
-        "📦 สินค้า & หมวดหมู่",
-        "🎟️ โปรโมชัน & ชำระเงิน",
-        "🏬 สาขา & ซัพพลายเออร์ (HR)",
-        "👤 พฤติกรรมลูกค้า & ซื้อซ้ำ",
-        "🚚 การจัดส่ง & การคืนสินค้า",
-    ])
+    with col4:
+        st.markdown("##### 📌 Quarterly AOV Trend")
+        f_reg4 = st.selectbox("เลือกภูมิภาค:", all_regions, key="sb_t1_c4")
+        df_c4 = df_raw.copy()
+        if f_reg4 != "ทั้งหมด (All Regions)":
+            df_c4 = df_c4[df_c4['region'] == f_reg4]
+            
+        q4 = df_c4.groupby(['Year_Q', 'region']).agg(rev=('revenue', 'sum'), ord=('order_id', 'nunique')).reset_index()
+        q4['AOV'] = q4['rev'] / q4['ord']
+        fig4 = px.line(q4, x='Year_Q', y='AOV', color='region', markers=True, title="Quarterly AOV")
+        fig4.update_layout(margin=dict(l=20, r=20, t=40, b=20), yaxis_tickprefix="$")
+        st.plotly_chart(fig4, width="stretch")
 
-    with t1:
-        st.header("📈 ยอดขายรวม แนวโน้มการเติบโต และยอดขายเฉลี่ย")
+# ---------------------------------------------------------
+# TAB 2: Customer & Regional Analysis
+# ---------------------------------------------------------
+with tab2:
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("##### 📌 Customer Cities Revenue")
+        c1_sub1, c1_sub2 = st.columns(2)
+        with c1_sub1:
+            f_yr_t2_1 = st.selectbox("เลือกปี:", all_years, key="sb_t2_c1_y")
+        with c1_sub2:
+            f_city_t2_1 = st.multiselect("เลือกเมืองเปรียบเทียบ:", all_cities, default=all_cities[:4], key="ms_t2_c1")
+            
+        df_t2_1 = df_raw.copy()
+        if f_yr_t2_1 != "ทุกปี (All Years)":
+            df_t2_1 = df_t2_1[df_t2_1['Year'] == f_yr_t2_1]
+        if f_city_t2_1:
+            df_t2_1 = df_t2_1[df_t2_1['customer_city'].isin(f_city_t2_1)]
+            
+        q_t2_1 = df_t2_1.groupby(['customer_city', 'Year'])['revenue'].sum().reset_index()
+        fig_t2_1 = px.bar(q_t2_1, x='revenue', y='customer_city', color='Year', barmode='group', orientation='h', title="Revenue by Selected Cities")
+        fig_t2_1.update_layout(margin=dict(l=20, r=20, t=40, b=20), xaxis_tickprefix="$", yaxis={'categoryorder':'total ascending'})
+        st.plotly_chart(fig_t2_1, width="stretch")
 
-        monthly_df = df_filtered.groupby("year_month", as_index=False).agg(
-            revenue=("revenue", "sum"),
-            orders=("order_id", "nunique"),
-            qty=("quantity", "sum")
-        ).sort_values("year_month")
+    with col2:
+        st.markdown("##### 📌 Monthly Active Purchasers")
+        f_reg_t2_2 = st.selectbox("เลือกภูมิภาค:", all_regions, key="sb_t2_c2")
+        df_t2_2 = df_raw.copy()
+        if f_reg_t2_2 != "ทั้งหมด (All Regions)":
+            df_t2_2 = df_t2_2[df_t2_2['region'] == f_reg_t2_2]
+            
+        q_t2_2 = df_t2_2.groupby(['Month', 'region'])['customer_id'].nunique().reset_index(name='active_customers')
+        fig_t2_2 = px.line(q_t2_2, x='Month', y='active_customers', color='region', markers=True, title="Active Purchasers Trend")
+        fig_t2_2.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+        st.plotly_chart(fig_t2_2, width="stretch")
+
+    col3, col4 = st.columns(2)
+    with col3:
+        st.markdown("##### 📌 Monthly Order Volume")
+        f_reg_t2_3 = st.selectbox("เลือกภูมิภาค:", all_regions, key="sb_t2_c3")
+        df_t2_3 = df_raw.copy()
+        if f_reg_t2_3 != "ทั้งหมด (All Regions)":
+            df_t2_3 = df_t2_3[df_t2_3['region'] == f_reg_t2_3]
+            
+        q_t2_3 = df_t2_3.groupby(['Month', 'region'])['order_id'].nunique().reset_index(name='order_count')
+        fig_t2_3 = px.bar(q_t2_3, x='Month', y='order_count', color='region', barmode='group', title="Monthly Orders")
+        fig_t2_3.update_layout(margin=dict(l=20, r=20, t=40, b=20))
+        st.plotly_chart(fig_t2_3, width="stretch")
+
+    with col4:
+        st.markdown("##### 📌 Customer AOV by City")
+        c4_sub1, c4_sub2 = st.columns(2)
+        with c4_sub1:
+            f_yr_t2_4 = st.selectbox("เลือกปี (AOV):", all_years, key="sb_t2_c4_y")
+        with c4_sub2:
+            f_city_t2_4 = st.multiselect("เลือกเมือง (AOV):", all_cities, default=all_cities[:4], key="ms_t2_c4")
         
-        monthly_df["aov"] = monthly_df.apply(lambda x: x["revenue"] / x["orders"] if x["orders"] > 0 else 0, axis=1)
-        monthly_df["prev_revenue"] = monthly_df["revenue"].shift(1)
+        df_t2_4 = df_raw.copy()
+        if f_yr_t2_4 != "ทุกปี (All Years)":
+            df_t2_4 = df_t2_4[df_t2_4['Year'] == f_yr_t2_4]
+        if f_city_t2_4:
+            df_t2_4 = df_t2_4[df_t2_4['customer_city'].isin(f_city_t2_4)]
+            
+        q_t2_4 = df_t2_4.groupby(['customer_city', 'Year']).agg(rev=('revenue', 'sum'), ord=('order_id', 'nunique')).reset_index()
+        q_t2_4['Customer_AOV'] = q_t2_4['rev'] / q_t2_4['ord']
         
-        # ปรับปรุง Logic การคำนวณ Growth ป้องกัน NaN และ Infinity
-        monthly_df["mom_growth_%"] = monthly_df.apply(
-            lambda x: ((x["revenue"] - x["prev_revenue"]) / x["prev_revenue"] * 100) 
-            if pd.notna(x["prev_revenue"]) and x["prev_revenue"] > 0 else 0.0,
-            axis=1
-        )
+        fig_t2_4 = px.bar(q_t2_4, x='customer_city', y='Customer_AOV', color='Year', barmode='group', title="AOV by Selected Cities")
+        fig_t2_4.update_layout(margin=dict(l=20, r=20, t=40, b=20), yaxis_tickprefix="$")
+        st.plotly_chart(fig_t2_4, width="stretch")
 
-        if not monthly_df.empty:
-            max_m_row = monthly_df.loc[monthly_df["revenue"].idxmax()]
-            min_m_row = monthly_df.loc[monthly_df["revenue"].idxmin()]
-            latest_m_row = monthly_df.iloc[-1]
+# ---------------------------------------------------------
+# TAB 3: Product & Promotion Performance
+# ---------------------------------------------------------
+with tab3:
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("##### 📌 Category Revenue by Region")
+        c3_sub1, c3_sub2 = st.columns(2)
+        with c3_sub1:
+            f_reg_t3_1 = st.selectbox("เลือกภูมิภาค:", all_regions, key="sb_t3_c1_r")
+        with c3_sub2:
+            f_cat_t3_1 = st.multiselect("เลือกหมวดหมู่:", all_cats_sorted, default=all_cats_sorted[:5], key="ms_t3_c1")
+            
+        df_t3_1 = df_raw.copy()
+        if f_reg_t3_1 != "ทั้งหมด (All Regions)":
+            df_t3_1 = df_t3_1[df_t3_1['region'] == f_reg_t3_1]
+        if f_cat_t3_1:
+            df_t3_1 = df_t3_1[df_t3_1['category'].isin(f_cat_t3_1)]
+            
+        q_t3_1 = df_t3_1.groupby(['category', 'region'])['revenue'].sum().reset_index()
+        q_t3_1['cat_sorted'] = pd.Categorical(q_t3_1['category'], categories=all_cats_sorted, ordered=True)
+        q_t3_1 = q_t3_1.sort_values('cat_sorted')
 
-            mc1, mc2, mc3, mc4 = st.columns(4)
-            mc1.metric("🟢 เดือนที่ยอดขายสูงสุด", f"{max_m_row['year_month']}", f"${max_m_row['revenue']:,.2f}")
-            mc2.metric("🔴 เดือนที่ยอดขายต่ำสุด", f"{min_m_row['year_month']}", f"${min_m_row['revenue']:,.2f}")
-            mc3.metric("💳 ยอดขายเฉลี่ยต่อคำสั่งซื้อ (AOV)", f"${overall_aov:,.2f}")
-            mc4.metric("📊 เติบโต MoM ล่าสุด", f"{latest_m_row['year_month']}", f"{latest_m_row['mom_growth_%']:+.2f}%")
+        fig_t3_1 = px.bar(q_t3_1, x='category', y='revenue', color='region', barmode='group', title="Revenue by Selected Categories")
+        fig_t3_1.update_layout(margin=dict(l=20, r=20, t=40, b=20), yaxis_tickprefix="$", xaxis_tickangle=-45)
+        st.plotly_chart(fig_t3_1, width="stretch")
 
-        c1, c2 = st.columns([2, 1])
-        with c1:
-            st.subheader("ยอดขายรวมรายเดือน & อัตราการเติบโต MoM %")
-            t_chart = alt.Chart(monthly_df).mark_line(point=True, color="#38bdf8", strokeWidth=3).encode(
-                x=alt.X("year_month:N", title="เดือน (YYYY-MM)"),
-                y=alt.Y("revenue:Q", title="ยอดขายรวม ($)"),
-                tooltip=["year_month", alt.Tooltip("revenue:Q", format="$,.2f"), alt.Tooltip("mom_growth_%:Q", format="+.2f")]
-            ).properties(height=320)
-            st.altair_chart(t_chart, use_container_width=True)
+    with col2:
+        st.markdown("##### 📌 Units Sold by Category")
+        c3_sub3, c3_sub4 = st.columns(2)
+        with c3_sub3:
+            f_reg_t3_2 = st.selectbox("เลือกภูมิภาค:", all_regions, key="sb_t3_c2_r")
+        with c3_sub4:
+            f_cat_t3_2 = st.multiselect("เลือกหมวดหมู่:", all_cats_sorted, default=all_cats_sorted[:5], key="ms_t3_c2")
+            
+        df_t3_2 = df_raw.copy()
+        if f_reg_t3_2 != "ทั้งหมด (All Regions)":
+            df_t3_2 = df_t3_2[df_t3_2['region'] == f_reg_t3_2]
+        if f_cat_t3_2:
+            df_t3_2 = df_t3_2[df_t3_2['category'].isin(f_cat_t3_2)]
+            
+        q_t3_2 = df_t3_2.groupby(['category', 'region'])['units_sold'].sum().reset_index()
+        q_t3_2['cat_sorted'] = pd.Categorical(q_t3_2['category'], categories=all_cats_sorted, ordered=True)
+        q_t3_2 = q_t3_2.sort_values('cat_sorted')
 
-        with c2:
-            st.subheader("ยอดขายเฉลี่ยต่อคำสั่งซื้อ (AOV) รายเดือน")
-            aov_chart = alt.Chart(monthly_df).mark_bar(color="#8b5cf6", cornerRadiusEnd=6).encode(
-                x=alt.X("year_month:N", title="เดือน"),
-                y=alt.Y("aov:Q", title="AOV ($)"),
-                tooltip=["year_month", alt.Tooltip("aov:Q", format="$,.2f")]
-            ).properties(height=320)
-            st.altair_chart(aov_chart, use_container_width=True)
+        fig_t3_2 = px.bar(q_t3_2, x='category', y='units_sold', color='region', barmode='group', title="Units Sold by Selected Categories")
+        fig_t3_2.update_layout(margin=dict(l=20, r=20, t=40, b=20), xaxis_tickangle=-45)
+        st.plotly_chart(fig_t3_2, width="stretch")
 
-        st.subheader("📋 ตารางสรุปยอดขายแยกตามรายเดือน")
-        st.dataframe(
-            monthly_df[["year_month", "revenue", "orders", "aov", "mom_growth_%"]].rename(columns={
-                "year_month": "เดือน",
-                "revenue": "ยอดขายรวม ($)",
-                "orders": "จำนวนออเดอร์",
-                "aov": "ยอดขายเฉลี่ย/ออเดอร์ (AOV)",
-                "mom_growth_%": "การเติบโตจากเดือนก่อน (%)"
-            }).style.format({
-                "ยอดขายรวม ($)": "${:,.2f}",
-                "จำนวนออเดอร์": "{:,}",
-                "ยอดขายเฉลี่ย/ออเดอร์ (AOV)": "${:,.2f}",
-                "การเติบโตจากเดือนก่อน (%)": "{:+.2f}%"
-            }),
-            use_container_width=True
-        )
+    col3, col4 = st.columns(2)
+    with col3:
+        st.markdown("##### 📌 Promotion Revenue Impact")
+        f_reg_t3_3 = st.selectbox("เลือกภูมิภาค:", all_regions, key="sb_t3_c3")
+        df_t3_3 = df_raw.copy()
+        if f_reg_t3_3 != "ทั้งหมด (All Regions)":
+            df_t3_3 = df_t3_3[df_t3_3['region'] == f_reg_t3_3]
+            
+        q_t3_3 = df_t3_3.groupby(['promotion_name', 'region'])['revenue'].sum().reset_index()
+        fig_t3_3 = px.bar(q_t3_3, x='revenue', y='promotion_name', color='region', barmode='group', orientation='h', title="Promotion Revenue")
+        fig_t3_3.update_layout(margin=dict(l=20, r=20, t=40, b=20), xaxis_tickprefix="$")
+        st.plotly_chart(fig_t3_3, width="stretch")
 
-    with t2:
-        st.header("📦 การวิเคราะห์ระดับสินค้า และหมวดหมู่สินค้า")
+    with col4:
+        st.markdown("##### 📌 Discount Tier Performance")
+        f_yr_t3_4 = st.selectbox("เลือกปี:", all_years, key="sb_t3_c4")
+        df_t3_4 = df_raw.copy()
+        if f_yr_t3_4 != "ทุกปี (All Years)":
+            df_t3_4 = df_t3_4[df_t3_4['Year'] == f_yr_t3_4]
+            
+        q_t3_4 = df_t3_4.groupby(['Year', 'promotion_name'])['revenue'].sum().reset_index()
+        fig_t3_4 = px.bar(q_t3_4, x='Year', y='revenue', color='promotion_name', barmode='group', title="Discount Tier Revenue")
+        fig_t3_4.update_layout(margin=dict(l=20, r=20, t=40, b=20), yaxis_tickprefix="$")
+        st.plotly_chart(fig_t3_4, width="stretch")
 
-        prod_df = df_filtered.groupby(["product_name", "category_name"], as_index=False).agg(
-            total_revenue=("revenue", "sum"),
-            total_qty=("quantity", "sum"),
-            refund_amount=("refund_amount", "sum")
-        )
+# ---------------------------------------------------------
+# TAB 4: Supply Chain, Returns & Logistics
+# ---------------------------------------------------------
+with tab4:
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown("##### 📌 Supplier Revenue by Country")
+        f_cnt_t4_1 = st.selectbox("เลือกประเทศ Supplier:", all_countries, key="sb_t4_c1")
+        df_t4_1 = df_raw.copy()
+        if f_cnt_t4_1 != "ทุกประเทศ (All)":
+            df_t4_1 = df_t4_1[df_t4_1['supplier_country'] == f_cnt_t4_1]
+            
+        q_t4_1 = df_t4_1.groupby(['Year', 'supplier_country'])['revenue'].sum().reset_index()
+        fig_t4_1 = px.bar(q_t4_1, x='Year', y='revenue', color='supplier_country', barmode='group', title="Supplier Revenue")
+        fig_t4_1.update_layout(margin=dict(l=20, r=20, t=40, b=20), yaxis_tickprefix="$")
+        st.plotly_chart(fig_t4_1, width="stretch")
 
-        top_rev_prod = prod_df.loc[prod_df["total_revenue"].idxmax()] if not prod_df.empty else None
-        top_qty_prod = prod_df.loc[prod_df["total_qty"].idxmax()] if not prod_df.empty else None
+    with col2:
+        st.markdown("##### 📌 Supplier Revenue by Region")
+        f_reg_t4_2 = st.selectbox("เลือกภูมิภาคร้านค้า:", all_regions, key="sb_t4_c2")
+        df_t4_2 = df_raw.copy()
+        if f_reg_t4_2 != "ทั้งหมด (All Regions)":
+            df_t4_2 = df_t4_2[df_t4_2['region'] == f_reg_t4_2]
+            
+        q_t4_2 = df_t4_2.groupby(['supplier_country', 'region'])['revenue'].sum().reset_index()
+        fig_t4_2 = px.bar(q_t4_2, x='supplier_country', y='revenue', color='region', barmode='group', title="Supplier Share by Region")
+        fig_t4_2.update_layout(margin=dict(l=20, r=20, t=40, b=20), yaxis_tickprefix="$")
+        fig_t4_2.update_traces(hovertemplate='Region: %{fullData.name}<br>Revenue: $%{y:,.2f}')
+        st.plotly_chart(fig_t4_2, width="stretch")
 
-        pc1, pc2 = st.columns(2)
-        if top_rev_prod is not None:
-            pc1.metric("🏆 สินค้าที่สร้างรายได้สูงที่สุด", f"{top_rev_prod['product_name']}", f"${top_rev_prod['total_revenue']:,.2f}")
-        if top_qty_prod is not None:
-            pc2.metric("📦 สินค้าที่ขายได้จำนวนชิ้นมากที่สุด", f"{top_qty_prod['product_name']}", f"{top_qty_prod['total_qty']:,} ชิ้น")
+    col3, col4 = st.columns(2)
+    with col3:
+        st.markdown("##### 📌 Supplier Revenue by Category")
+        c4_sub1, c4_sub2 = st.columns(2)
+        with c4_sub1:
+            f_cnt_t4_3 = st.selectbox("ประเทศ Supplier:", all_countries, key="sb_t4_c3_c")
+        with c4_sub2:
+            f_cat_t4_3 = st.multiselect("เลือกหมวดหมู่:", all_cats_sorted, default=all_cats_sorted[:5], key="ms_t4_c3")
+            
+        df_t4_3 = df_raw.copy()
+        if f_cnt_t4_3 != "ทุกประเทศ (All)":
+            df_t4_3 = df_t4_3[df_t4_3['supplier_country'] == f_cnt_t4_3]
+        if f_cat_t4_3:
+            df_t4_3 = df_t4_3[df_t4_3['category'].isin(f_cat_t4_3)]
+            
+        q_t4_3 = df_t4_3.groupby(['supplier_country', 'category'])['revenue'].sum().reset_index()
+        fig_t4_3 = px.bar(q_t4_3, x='supplier_country', y='revenue', color='category', barmode='group', title="Supplier Revenue by Categories")
+        fig_t4_3.update_layout(margin=dict(l=20, r=20, t=40, b=20), yaxis_tickprefix="$")
+        st.plotly_chart(fig_t4_3, width="stretch")
 
-        r1, r2 = st.columns(2)
-        with r1:
-            st.subheader("Top 10 สินค้าสร้างรายได้สูงสุด")
-            top_rev_10 = prod_df.sort_values("total_revenue", ascending=False).head(10)
-            st.altair_chart(
-                alt.Chart(top_rev_10).mark_bar(color="#10b981", cornerRadiusEnd=6).encode(
-                    x=alt.X("total_revenue:Q", title="รายได้ ($)"),
-                    y=alt.Y("product_name:N", sort="-x", title="ชื่อสินค้า"),
-                    tooltip=["product_name", "category_name", alt.Tooltip("total_revenue:Q", format="$,.2f")]
-                ).properties(height=320),
-                use_container_width=True
-            )
-
-        with r2:
-            st.subheader("Top 10 สินค้าขายได้จำนวนชิ้นมากที่สุด")
-            top_qty_10 = prod_df.sort_values("total_qty", ascending=False).head(10)
-            st.altair_chart(
-                alt.Chart(top_qty_10).mark_bar(color="#f59e0b", cornerRadiusEnd=6).encode(
-                    x=alt.X("total_qty:Q", title="จำนวนชิ้น"),
-                    y=alt.Y("product_name:N", sort="-x", title="ชื่อสินค้า"),
-                    tooltip=["product_name", "category_name", alt.Tooltip("total_qty:Q", format=",d")]
-                ).properties(height=320),
-                use_container_width=True
-            )
-
-        st.markdown("---")
-        c1, c2 = st.columns(2)
-        with c1:
-            st.subheader("หมวดหมู่สินค้าที่ทำรายได้ดีที่สุด")
-            cat_df = df_filtered.groupby("category_name", as_index=False)["revenue"].sum().sort_values("revenue", ascending=False)
-            st.altair_chart(
-                alt.Chart(cat_df).mark_bar(color="#6366f1", cornerRadiusEnd=6).encode(
-                    x=alt.X("revenue:Q", title="ยอดขายรวม ($)"),
-                    y=alt.Y("category_name:N", sort="-x", title="หมวดหมู่"),
-                    tooltip=["category_name", alt.Tooltip("revenue:Q", format="$,.2f")]
-                ).properties(height=300),
-                use_container_width=True
-            )
-
-        with c2:
-            st.subheader("หมวดหมู่ที่มีมูลค่าการคืนสินค้าสูงสุด")
-            cat_ret_df = df_filtered.groupby("category_name", as_index=False)["refund_amount"].sum().sort_values("refund_amount", ascending=False)
-            st.altair_chart(
-                alt.Chart(cat_ret_df).mark_bar(color="#ef4444", cornerRadiusEnd=6).encode(
-                    x=alt.X("refund_amount:Q", title="มูลค่าเงินคืน ($)"),
-                    y=alt.Y("category_name:N", sort="-x", title="หมวดหมู่"),
-                    tooltip=["category_name", alt.Tooltip("refund_amount:Q", format="$,.2f")]
-                ).properties(height=300),
-                use_container_width=True
-            )
-    with t3:
-        st.header("🎟️ การวิเคราะห์ผลกระทบของโปรโมชันและการชำระเงิน")
-
-        promo_comp = df_filtered.groupby("is_promo", as_index=False).agg(
-            total_revenue=("revenue", "sum"),
-            orders_count=("order_id", "nunique"),
-            total_qty=("quantity", "sum")
-        )
-        promo_comp["aov"] = promo_comp.apply(lambda x: x["total_revenue"] / x["orders_count"] if x["orders_count"] > 0 else 0, axis=1)
-
-        p1, p2 = st.columns(2)
-        with p1:
-            st.subheader("เปรียบเทียบยอดขาย: มีโปรโมชัน vs ไม่มีโปรโมชัน")
-            st.altair_chart(
-                alt.Chart(promo_comp).mark_bar(cornerRadiusEnd=6).encode(
-                    x=alt.X("is_promo:N", title="สถานะโปรโมชัน"),
-                    y=alt.Y("total_revenue:Q", title="ยอดขายรวม ($)"),
-                    color=alt.Color("is_promo:N", scale=alt.Scale(domain=["มีโปรโมชัน", "ไม่มีโปรโมชัน"], range=["#10b981", "#64748b"])),
-                    tooltip=["is_promo", alt.Tooltip("total_revenue:Q", format="$,.2f"), "orders_count", alt.Tooltip("aov:Q", format="$,.2f")]
-                ).properties(height=300),
-                use_container_width=True
-            )
-
-        with p2:
-            st.subheader("เปรียบเทียบยอดขายเฉลี่ย/คำสั่งซื้อ (AOV) จากโปรโมชัน")
-            st.altair_chart(
-                alt.Chart(promo_comp).mark_bar(cornerRadiusEnd=6).encode(
-                    x=alt.X("is_promo:N", title="สถานะโปรโมชัน"),
-                    y=alt.Y("aov:Q", title="AOV ($)"),
-                    color=alt.Color("is_promo:N", scale=alt.Scale(domain=["มีโปรโมชัน", "ไม่มีโปรโมชัน"], range=["#06b6d4", "#94a3b8"])),
-                    tooltip=["is_promo", alt.Tooltip("aov:Q", format="$,.2f")]
-                ).properties(height=300),
-                use_container_width=True
-            )
-
-        promo_name_df = df_filtered.groupby("promotion_name", as_index=False).agg(
-            total_revenue=("revenue", "sum"),
-            orders_count=("order_id", "nunique")
-        ).sort_values("total_revenue", ascending=False)
-
-        top_promo_row = promo_name_df.iloc[0] if not promo_name_df.empty else None
-        if top_promo_row is not None:
-            st.metric("🎟️ โปรโมชันที่สร้างรายได้จากการขายมากที่สุด", f"{top_promo_row['promotion_name']}", f"${top_promo_row['total_revenue']:,.2f}")
-
-        st.altair_chart(
-            alt.Chart(promo_name_df).mark_bar(color="#f59e0b", cornerRadiusEnd=6).encode(
-                x=alt.X("total_revenue:Q", title="ยอดขายรวม ($)"),
-                y=alt.Y("promotion_name:N", sort="-x", title="ชื่อโปรโมชัน"),
-                tooltip=["promotion_name", alt.Tooltip("total_revenue:Q", format="$,.2f"), "orders_count"]
-            ).properties(height=320),
-            use_container_width=True
-        )
-
-    with t4:
-        st.header("🏬 การวิเคราะห์ประสิทธิภาพสาขา ร้านค้า ซัพพลายเออร์ และ HR")
-
-        store_df = df_filtered.groupby("store_label", as_index=False).agg(
-            total_revenue=("revenue", "sum"),
-            orders_count=("order_id", "nunique")
-        )
-        store_df["aov"] = store_df.apply(lambda x: x["total_revenue"] / x["orders_count"] if x["orders_count"] > 0 else 0, axis=1)
-
-        best_sales_store = store_df.loc[store_df["total_revenue"].idxmax()] if not store_df.empty else None
-        best_aov_store = store_df.loc[store_df["aov"].idxmax()] if not store_df.empty else None
-
-        sup_df = df_filtered.groupby(["supplier_name", "supplier_country"], as_index=False).agg(
-            total_revenue=("revenue", "sum"),
-            items_sold=("quantity", "sum")
-        ).sort_values("total_revenue", ascending=False)
-        top_sup_row = sup_df.iloc[0] if not sup_df.empty else None
-
-        sc1, sc2, sc3 = st.columns(3)
-        if best_sales_store is not None:
-            sc1.metric("🏬 ร้านค้าที่มียอดขายดีที่สุด", f"{best_sales_store['store_label']}", f"${best_sales_store['total_revenue']:,.2f}")
-        if best_aov_store is not None:
-            sc2.metric("💳 ร้านค้าที่มียอดขายเฉลี่ย/ออเดอร์สูงสุด", f"{best_aov_store['store_label']}", f"${best_aov_store['aov']:,.2f}")
-        if top_sup_row is not None:
-            sc3.metric("🏭 Supplier ที่สร้างรายได้สูงที่สุด", f"{top_sup_row['supplier_name']}", f"${top_sup_row['total_revenue']:,.2f}")
-
-        s1, s2 = st.columns(2)
-        with s1:
-            st.subheader("ยอดขายรวมแยกตามร้านค้า/สาขา")
-            st.altair_chart(
-                alt.Chart(store_df.sort_values("total_revenue", ascending=False)).mark_bar(color="#6366f1", cornerRadiusEnd=6).encode(
-                    x=alt.X("total_revenue:Q", title="ยอดขาย ($)"),
-                    y=alt.Y("store_label:N", sort="-x", title="ร้านค้า/สาขา"),
-                    tooltip=["store_label", alt.Tooltip("total_revenue:Q", format="$,.2f"), "orders_count"]
-                ).properties(height=300),
-                use_container_width=True
-            )
-
-        with s2:
-            st.subheader("ยอดขายเฉลี่ยต่อคำสั่งซื้อ (AOV) แยกตามสาขา")
-            st.altair_chart(
-                alt.Chart(store_df.sort_values("aov", ascending=False)).mark_bar(color="#06b6d4", cornerRadiusEnd=6).encode(
-                    x=alt.X("aov:Q", title="AOV ($)"),
-                    y=alt.Y("store_label:N", sort="-x", title="ร้านค้า/สาขา"),
-                    tooltip=["store_label", alt.Tooltip("aov:Q", format="$,.2f")]
-                ).properties(height=300),
-                use_container_width=True
-            )
-
-        st.subheader("ซัพพลายเออร์ (Supplier) ที่สร้างรายได้สูงสุด")
-        st.altair_chart(
-            alt.Chart(sup_df.head(10)).mark_bar(color="#ec4899", cornerRadiusEnd=6).encode(
-                x=alt.X("total_revenue:Q", title="รายได้สร้างจากสินค้า ($)"),
-                y=alt.Y("supplier_name:N", sort="-x", title="ชื่อ Supplier"),
-                tooltip=["supplier_name", "supplier_country", alt.Tooltip("total_revenue:Q", format="$,.2f")]
-            ).properties(height=300),
-            use_container_width=True
-        )
-
-        if not df_emp_filtered.empty:
-            st.markdown("---")
-            st.subheader("📊 สถิติด้านทรัพยากรบุคคลและความคุ้มค่าแรงงาน (HR Analytics)")
-            hr_city = df_emp_filtered.groupby("store_city", as_index=False).agg(
-                headcount=("employee_id", "count"),
-                total_payroll=("salary", "sum"),
-                avg_salary=("salary", "mean"),
-            )
-            city_rev = df_filtered.groupby("store_city", as_index=False)["revenue"].sum()
-            hr_city = pd.merge(city_rev, hr_city, on="store_city", how="outer").fillna(0)
-            hr_city["revenue_per_emp"] = hr_city.apply(lambda x: x["revenue"] / x["headcount"] if x["headcount"] > 0 else 0, axis=1)
-            hr_city["payroll_to_revenue_%"] = hr_city.apply(lambda x: (x["total_payroll"] / x["revenue"]) * 100 if x["revenue"] > 0 else 0, axis=1)
-
-            st.dataframe(
-                hr_city.style.format({
-                    "headcount": "{:,.0f}",
-                    "total_payroll": "${:,.2f}",
-                    "avg_salary": "${:,.2f}",
-                    "revenue": "${:,.2f}",
-                    "revenue_per_emp": "${:,.2f}",
-                    "payroll_to_revenue_%": "{:.2f}%",
-                }),
-                use_container_width=True
-            )
-
-    with t5:
-        st.header("👤 การวิเคราะห์พฤติกรรมลูกค้า กลุ่มลูกค้า และการซื้อซ้ำ")
-
-        cust_summary = df_filtered.groupby("customer_id", as_index=False).agg(
-            orders_count=("order_id", "nunique"),
-            total_spend=("revenue", "sum"),
-            items_bought=("quantity", "sum"),
-            customer_name=("customer_name", "first"),
-            customer_city=("customer_city", "first")
-        )
-
-        def get_freq_segment(cnt):
-            if cnt == 1:
-                return "1. One-time (1 ออเดอร์)"
-            elif cnt <= 3:
-                return "2. Occasional (2-3 ออเดอร์)"
-            elif cnt <= 5:
-                return "3. Frequent (4-5 ออเดอร์)"
-            else:
-                return "4. VIP (6+ ออเดอร์)"
-
-        cust_summary["segment"] = cust_summary["orders_count"].apply(get_freq_segment)
-        seg_df = cust_summary.groupby("segment", as_index=False).agg(
-            customer_count=("customer_id", "count"),
-            total_revenue=("total_spend", "sum")
-        ).sort_values("segment")
-
-        uc1, uc2 = st.columns(2)
-        uc1.metric("🔄 อัตราการกลับมาซื้อซ้ำของลูกค้า", f"{repeat_rate:.2f}%", f"{repeat_customers:,} จาก {total_customers:,} ราย")
-        top_seg_row = seg_df.loc[seg_df["total_revenue"].idxmax()] if not seg_df.empty else None
-        if top_seg_row is not None:
-            uc2.metric("👥 กลุ่มลูกค้าที่สร้างรายได้มากที่สุด", f"{top_seg_row['segment']}", f"${top_seg_row['total_revenue']:,.2f}")
-
-        u1, u2 = st.columns(2)
-        with u1:
-            st.subheader("รายได้แยกตามกลุ่มพฤติกรรมการซื้อซ้ำของลูกค้า")
-            st.altair_chart(
-                alt.Chart(seg_df).mark_bar(color="#3b82f6", cornerRadiusEnd=6).encode(
-                    x=alt.X("total_revenue:Q", title="รายได้รวม ($)"),
-                    y=alt.Y("segment:N", title="กลุ่มลูกค้า"),
-                    tooltip=["segment", "customer_count", alt.Tooltip("total_revenue:Q", format="$,.2f")]
-                ).properties(height=300),
-                use_container_width=True
-            )
-
-        with u2:
-            st.subheader("ยอดขายแบ่งตามเมืองของลูกค้า (Customer City Segment)")
-            city_cust_df = df_filtered.groupby("customer_city", as_index=False)["revenue"].sum().sort_values("revenue", ascending=False)
-            st.altair_chart(
-                alt.Chart(city_cust_df).mark_bar(color="#10b981", cornerRadiusEnd=6).encode(
-                    x=alt.X("revenue:Q", title="ยอดขาย ($)"),
-                    y=alt.Y("customer_city:N", sort="-x", title="เมืองของลูกค้า"),
-                    tooltip=["customer_city", alt.Tooltip("revenue:Q", format="$,.2f")]
-                ).properties(height=300),
-                use_container_width=True
-            )
-
-        st.subheader("🏆 Top 10 ลูกค้าที่มียอดใช้จ่ายสูงสุด")
-        top_10_cust = cust_summary.sort_values("total_spend", ascending=False).head(10)
-        st.dataframe(
-            top_10_cust[["customer_name", "customer_city", "orders_count", "items_bought", "total_spend"]].rename(columns={
-                "customer_name": "ชื่อลูกค้า",
-                "customer_city": "เมือง",
-                "orders_count": "จำนวนออเดอร์",
-                "items_bought": "จำนวนสินค้าที่ซื้อ",
-                "total_spend": "ยอดใช้จ่ายรวม ($)"
-            }).style.format({
-                "จำนวนออเดอร์": "{:,}",
-                "จำนวนสินค้าที่ซื้อ": "{:,}",
-                "ยอดใช้จ่ายรวม ($)": "${:,.2f}"
-            }),
-            use_container_width=True
-        )
-
-    with t6:
-        st.header("🚚 การวิเคราะห์ประสิทธิภาพการจัดส่งและการคืนสินค้า")
-
-        ship_df = df_filtered.drop_duplicates(subset=["order_id"]).copy()
-
-        delivered_statuses = ["Delivered", "On Time", "Shipped", "Completed"]
-        delivered_count = ship_df["shipment_status"].isin(delivered_statuses).sum()
-        total_shipped = len(ship_df)
-        on_time_rate = (delivered_count / total_shipped * 100) if total_shipped > 0 else 0
-
-        shp_stat_df = ship_df.groupby("shipment_status", as_index=False)["order_id"].count()
-
-        sh1, sh2 = st.columns(2)
-        sh1.metric("🚚 อัตราการจัดส่งสำเร็จ/ส่งมอบแล้ว", f"{on_time_rate:.1f}%", f"{total_shipped:,} ออเดอร์ทั้งหมด")
-        sh2.metric("💸 มูลค่าเงินคืนรวมจากการส่งคืนสินค้า", f"${refunds:,.2f}")
-
-        d1, d2 = st.columns(2)
-        with d1:
-            st.subheader("สัดส่วนสถานะการจัดส่งสินค้า")
-            st.altair_chart(
-                alt.Chart(shp_stat_df).mark_arc(innerRadius=50, cornerRadius=4).encode(
-                    theta=alt.Theta("order_id:Q"),
-                    color=alt.Color("shipment_status:N", scale=alt.Scale(scheme="tableau10"), title="สถานะ"),
-                    tooltip=["shipment_status", alt.Tooltip("order_id:Q", title="จำนวนออเดอร์", format=",d")]
-                ).properties(height=300),
-                use_container_width=True
-            )
-
-        with d2:
-            st.subheader("Top 10 สินค้าที่มีมูลค่าการคืนเงินสูงสุด")
-            ret_prod_df = df_filtered.groupby("product_name", as_index=False)["refund_amount"].sum().sort_values("refund_amount", ascending=False).head(10)
-            st.altair_chart(
-                alt.Chart(ret_prod_df).mark_bar(color="#f43f5e", cornerRadiusEnd=6).encode(
-                    x=alt.X("refund_amount:Q", title="มูลค่าคืนเงิน ($)"),
-                    y=alt.Y("product_name:N", sort="-x", title="ชื่อสินค้า"),
-                    tooltip=["product_name", alt.Tooltip("refund_amount:Q", format="$,.2f")]
-                ).properties(height=300),
-                use_container_width=True
-            )
-
-if __name__ == "__main__":
-    main()
+    with col4:
+        st.markdown("##### 📌 Monthly Refund Trend")
+        f_reg_t4_4 = st.selectbox("เลือกภูมิภาค:", all_regions, key="sb_t4_c4")
+        df_t4_4 = df_raw.copy()
+        if f_reg_t4_4 != "ทั้งหมด (All Regions)":
+            df_t4_4 = df_t4_4[df_t4_4['region'] == f_reg_t4_4]
+            
+        q_t4_4 = df_t4_4.groupby(['Month', 'region'])['refund_amount'].sum().reset_index()
+        fig_t4_4 = px.line(q_t4_4, x='Month', y='refund_amount', color='region', markers=True, title="Monthly Refunds")
+        fig_t4_4.update_layout(margin=dict(l=20, r=20, t=40, b=20), yaxis_tickprefix="$")
+        st.plotly_chart(fig_t4_4, width="stretch")
