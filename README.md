@@ -2,22 +2,23 @@
 For Datawarehouse
 # Presentation
 https://canva.link/u97bsquxyowjw6u
+## Link Web
+https://dadamini-project-aj-perm-manifest-get-a.streamlit.app/
 ### สมาชิก
-1.นางสาวกนกวรรณ ทองเทพ รหัสนักศึกษา 673020243-5
+1.นางสาวกนกวรรณ ทองเทพ รหัสนักศึกษา 673020243-5 หน้าที่ โหลดข้อมูลเข้า github ติดตั้ง package ต่าง ๆ ทำกระบวนการ ELT และเขียนโค้ดในส่วน stg
    
-2.นายณัฐวุฒิ กำจัดภัย รหัสนักศึกษา 673020251-6
+2.นายณัฐวุฒิ กำจัดภัย รหัสนักศึกษา 673020251-6 หน้าที่ ออกแบบ Multidimension รันโค้ด query.py เพื่อแสดงตาราง
    
-3.นางสาวณิรดา อนุนิวัฒน์ รหัสนักศึกษา 673020252-4
+3.นางสาวณิรดา อนุนิวัฒน์ รหัสนักศึกษา 673020252-4 หน้าที่ ออกแบบ ER Diagram และเขียนโค้ดในส่วน stg
    
-4.นายภูธิป ต้นโลห์ รหัสนักศึกษา 673020261-3
+4.นายภูธิป ต้นโลห์ รหัสนักศึกษา 673020261-3  หน้าที่ ออกแบบ Business Questions เขียนโค้ด dim และ fact
 
-5.นางสาวสุพิชชา คำสิงห์ รหัสนักศึกษา 673020265-5
+5.นางสาวสุพิชชา คำสิงห์ รหัสนักศึกษา 673020265-5 หน้าที่ ออกแบบ Multidimension และ ออกแบบ Model Diagram เขียนโค้ดในส่วน dim และ fact เช็คและตรวจสอบทุกส่วน
 
-6.นายสุวิชชา ผาสุข รหัสนักศึกษา 673020267-1
+6.นายสุวิชชา ผาสุข รหัสนักศึกษา 673020267-1 หน้าที่ เขียนโค้ด query.py และเขียนโค้ดในส่วน app.py พร้อมแสดงหน้าของ Datawarehouse
 
-7.นายอพิชัย อิ่มวงค์ รหัสนักศึกษา 673020269-7
+7.นายอพิชัย อิ่มวงค์ รหัสนักศึกษา 673020269-7 หน้าที่ เขียนโค้ดในส่วนของ dashboard พร้อมแสดง dashboard ที่สมบูรณ์ของโปรเจค เช็คและตรวจสอบทุกส่วน
 
-slide canva : https://canva.link/drif8b1apsznvjm
 
 ## การออกแบบและพัฒนาคลังข้อมูลเพื่อวิเคราะห์ข้อมูลการขายในธุรกิจค้าปลีก (Retail Analytics: From OLTP to OLAP Data Warehouse)
 
@@ -195,9 +196,9 @@ Customer → Order → Order Item → Payment → Shipment → Return
 | stores | 1:N | employees |
 
 ## 3.Business Questions (ฟีฟ่า)
-<img src="./readme_images/Business Q1.jpg">
-<img src="./readme_images/KPI1.jpg">
-<img src="./readme_images/KPI2.jpg">
+<img src="./readme_images/BusinessQ.jpg">
+<img src="./readme_images/BusinessQQ.jpg">
+<img src="./readme_images/BusinessQQQ.jpg">
 
 ## 4.Business Process and Multidimensional Data Model
 
@@ -1148,7 +1149,7 @@ Retail Data Warehouse
 SQL / Report / Dashboard
 
 สรุป: โครงงานนี้ใช้แนวทาง ELT โดยให้ GitHub เป็นแหล่งจัดเก็บ Source Data, ใช้ dbt เป็นเครื่องมือสำหรับ Load, Cleaning, Validation และ Transformation และใช้ DuckDB เป็น Database และ Data Warehouse ก่อนนำข้อมูลที่ผ่านการจัดโครงสร้างแล้วไปใช้สำหรับการวิเคราะห์ข้อมูลต่อไป
-```
+
 ## Dashboard Link
 https://dadamini-project-aj-perm-manifest-get-a.streamlit.app/
 # Infographic
@@ -1162,6 +1163,8 @@ https://www.kaggle.com/datasets/datarspectrum/retail-data-warehouse-12-table-1m-
 ## ขั้นตอนการเข้าใช้งาน Codespace ( Dashboard )
 1.เตรียม Virtual Environment 
    python -m venv venv
-source venv/bin/activate  # สำหรับ Mac/Linux
+source venv/bin/activate 
+### สำหรับ Mac/Linux
 2.ใช้ CD Retail_data เพื่อเข้าสู่โฟล์เดอร์ Retail_data
+
 3.ใช้คำสั่ง streamlit run dashboard_app.py เพื่อเข้าสู่หน้า Dashboard
