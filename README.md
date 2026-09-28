@@ -1164,7 +1164,7 @@ https://www.kaggle.com/datasets/datarspectrum/retail-data-warehouse-12-table-1m-
 1.เตรียม Virtual Environment 
    python -m venv venv
 source venv/bin/activate 
-# สำหรับ Mac/Linux
+### สำหรับ Mac/Linux
 2.ใช้ CD Retail_data เพื่อเข้าสู่โฟล์เดอร์ Retail_data
 
 3.ใช้คำสั่ง streamlit run dashboard_app.py เพื่อเข้าสู่หน้า Dashboard
