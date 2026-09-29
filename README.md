@@ -1148,7 +1148,7 @@ Retail Data Warehouse
 SQL / Report / Dashboard
 
 สรุป: โครงงานนี้ใช้แนวทาง ELT โดยให้ GitHub เป็นแหล่งจัดเก็บ Source Data, ใช้ dbt เป็นเครื่องมือสำหรับ Load, Cleaning, Validation และ Transformation และใช้ DuckDB เป็น Database และ Data Warehouse ก่อนนำข้อมูลที่ผ่านการจัดโครงสร้างแล้วไปใช้สำหรับการวิเคราะห์ข้อมูลต่อไป
-```
+
 ## Dashboard Link
 https://dadamini-project-aj-perm-manifest-get-a.streamlit.app/
 # Infographic
