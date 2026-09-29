@@ -1,7 +1,5 @@
 # Mini-Project
 For Datawarehouse
-# Presentation
-https://canva.link/u97bsquxyowjw6u
 ## Link Web
 https://dadamini-project-aj-perm-manifest-get-a.streamlit.app/
 ### สมาชิก
