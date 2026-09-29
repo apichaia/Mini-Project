@@ -1153,7 +1153,7 @@ SQL / Report / Dashboard
 ## Dashboard Link
 https://dadamini-project-aj-perm-manifest-get-a.streamlit.app/
 # Infographic
-<img src="./readme_images/infographic.png">
+<img src="./readme_images/Infographic_new.png">
 
 # Source
 Datarspectrum Technology Training Center. (n.d.). Retail Data Warehouse – 12 Table 1M+ Rows Dataset [Data set]. Kaggle.
